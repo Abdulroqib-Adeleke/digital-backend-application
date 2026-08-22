@@ -5,7 +5,6 @@ import com.groupa.digitalbackendapplication.domain.dto.request.CustomerRegistrat
 import com.groupa.digitalbackendapplication.domain.dto.response.*;
 import com.groupa.digitalbackendapplication.domain.entities.Account;
 import com.groupa.digitalbackendapplication.domain.entities.Customer;
-import com.groupa.digitalbackendapplication.domain.entities.User;
 import com.groupa.digitalbackendapplication.domain.enums.AccountStatus;
 import com.groupa.digitalbackendapplication.domain.enums.AccountTier;
 import com.groupa.digitalbackendapplication.domain.enums.Gender;
@@ -13,14 +12,10 @@ import com.groupa.digitalbackendapplication.domain.enums.Role;
 import com.groupa.digitalbackendapplication.domain.response.Response;
 import com.groupa.digitalbackendapplication.exceptions.BadRequestException;
 import com.groupa.digitalbackendapplication.exceptions.ResourceNotFoundException;
-import com.groupa.digitalbackendapplication.notification.EmailDetails;
-import com.groupa.digitalbackendapplication.notification.EmailService;
 import com.groupa.digitalbackendapplication.repository.AccountRepository;
 import com.groupa.digitalbackendapplication.repository.CustomerRepository;
-import com.groupa.digitalbackendapplication.repository.UserRepository;
 import com.groupa.digitalbackendapplication.security.AuthUser;
 import com.groupa.digitalbackendapplication.service.CustomerService;
-import com.groupa.digitalbackendapplication.service.LoginSessionService;
 import com.groupa.digitalbackendapplication.service.OtpService;
 import com.groupa.digitalbackendapplication.utils.AccountUtil;
 import com.groupa.digitalbackendapplication.utils.LoginSessionUtil;
@@ -36,7 +31,6 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.Period;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -50,11 +44,9 @@ public class CustomerServiceImpl implements CustomerService {
     private final AccountRepository accountRepository;
     private final AccountUtil accountUtil;
     private final PasswordEncoder passwordEncoder;
-    private final LoginSessionService loginSessionService;
     private final LoginSessionUtil loginSessionUtil;
     private final SecurityUtil securityUtil;
     private final EncryptionUtil encryptionUtil;
-    private final EmailService emailService;
     private final OtpService otpService;
 
     @Override
@@ -76,7 +68,6 @@ public class CustomerServiceImpl implements CustomerService {
         String accountNumber = accountUtil.generateAccountNumber();
 
         //Continue account creation
-
         Account account = buildAccount(userResponse.getCustomerId(), accountStatus, accountNumber, accountTier);
         AccountCreatedResponse createAccount = new AccountCreatedResponse(account.getAccountNumber());
         otpService.generateAndSendOtp(userResponse.getCustomerId(), account);
@@ -88,7 +79,6 @@ public class CustomerServiceImpl implements CustomerService {
                 .statusCode(HttpStatus.CREATED)
                 .build();
     }
-
 
     @Override
     public Response<CustomerDto> getUserProfile() {
@@ -105,7 +95,6 @@ public class CustomerServiceImpl implements CustomerService {
 
         Account account = accountRepository.findByOwnerId(customer.getId())
                 .orElseThrow(()-> new ResourceNotFoundException("Account not found"));
-
 
         AccountDto accountDto = AccountDto.builder()
                 .id(account.getId())
@@ -187,23 +176,6 @@ public class CustomerServiceImpl implements CustomerService {
         return accountRepository.save(account);
     }
 
-    private void sendAccountCreationEmail(String firstname, String email, String accountNumber, AccountTier accountTier){
-        String message = "Hi, " + firstname + "!\n\n" +
-                "Your account has been successfully created!\n\n" +
-                "Below are your account details:\n\n" +
-                "Account Number: " + accountNumber + "\n" +
-                "Account Type: " + accountTier + "\n" +
-                "Currency: NGN" + "\n\n" +
-                "You can now login and start using your account immediately!";
-
-        EmailDetails emailDetails = EmailDetails.builder()
-                .recipient(email)
-                .subject("Account Creation Successful")
-                .messageBody(message)
-                .build();
-        emailService.sendEmail(emailDetails);
-    }
-
     private ResponseWrapper<AuthResponse> buildAuthResponse(UUID id, String message, HttpStatusCode statusCode){
 
         AuthResponse authResponse =new AuthResponse(id);
@@ -218,5 +190,4 @@ public class CustomerServiceImpl implements CustomerService {
         Optional<Customer> customerOptional = customerRepository.findByPhoneNumber(phoneNumber);
         return customerOptional.isPresent();
     }
-
 }

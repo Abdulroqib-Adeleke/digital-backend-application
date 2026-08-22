@@ -9,6 +9,7 @@ import com.groupa.digitalbackendapplication.domain.entities.*;
 import com.groupa.digitalbackendapplication.domain.enums.*;
 import com.groupa.digitalbackendapplication.exceptions.BadRequestException;
 import com.groupa.digitalbackendapplication.exceptions.ResourceNotFoundException;
+import com.groupa.digitalbackendapplication.notification.TransactionAlertService;
 import com.groupa.digitalbackendapplication.repository.AccountRepository;
 import com.groupa.digitalbackendapplication.repository.CardDetailsRepository;
 import com.groupa.digitalbackendapplication.repository.DailyTransactionsRepository;
@@ -46,6 +47,7 @@ public class TransactionServiceImpl implements TransactionService {
     private final DepositService depositService;
     private final TierLimiterUtil tierLimiterUtil;
     private final SecurityUtil securityUtil;
+    private final TransactionAlertService transactionAlertService;
 
     @Override
     @Transactional
@@ -61,7 +63,6 @@ public class TransactionServiceImpl implements TransactionService {
 
         if(!isAccountActive(destinationAccount.getAccountNumber()))
             throw new BadRequestException("Can not transfer to this account");
-
 
         //Check if account balance isn't above tier maximum balance
         tierLimiterUtil.validateNotAlreadyOverTierMaxBalance(sourceAccount);
@@ -105,9 +106,12 @@ public class TransactionServiceImpl implements TransactionService {
         //Save transaction to db
         senderTransaction.addLedger(debit);
         senderTransaction.addLedger(credit);
-
         senderTransaction = transactionRepository.save(senderTransaction);
         transactionRepository.save(receiverTransaction);
+
+        //Send Transaction notification
+        transactionAlertService.sendDebitAlert(sourceAccount, payload.amount(), now);
+        transactionAlertService.sendCreditAlert(sourceAccount, payload.amount(), now);
 
         //Update daily transactions table
         DailyTransactions dailyTransactions = fetchDailyTransactionEntity();
@@ -148,10 +152,14 @@ public class TransactionServiceImpl implements TransactionService {
         if (cardDetails.transactionStatus() == TransactionStatus.SUCCESSFUL) {
             Transaction savedTransaction = depositService.buildSuccessfulDeposit(destinationAccount, payload);
 
+            //Send Credit Alert
+            transactionAlertService.sendCreditAlert(destinationAccount, payload.depositAmount(), LocalDateTime.now());
+
             //Update daily transactions table
             DailyTransactions dailyTransactions = fetchDailyTransactionEntity();
             dailyTransactions.setTotalCredit(dailyTransactions.getTotalCredit().add(payload.depositAmount()));
             dailyTransactionsRepository.save(dailyTransactions);
+
             return ResponseWrapper.<TransactionStatusResponse>builder()
                     .data(buildTransactionResponse(savedTransaction.getTransactionStatus()))
                     .message("Deposit Successful")
@@ -187,20 +195,27 @@ public class TransactionServiceImpl implements TransactionService {
 
         TransactionStatus updatedTransactionStatus = transaction.getTransactionStatus();
 
+        LocalDateTime updatedLedgerTime = LocalDateTime.now();
+
         //IF UPDATED TRANSACTION STATUS IS NOW SUCCESSFUL, WE CAN ADD THIS FUNDS TO CUSTOMER'S WALLET
         if (updatedTransactionStatus == TransactionStatus.SUCCESSFUL) {
             Account account = transaction.getDestinationAccount();
             account.setBalance(account.getBalance().add(transaction.getAmountTransferred()));
+
+            transactionAlertService.sendCreditAlert(account, transaction.getAmountTransferred(), updatedLedgerTime);
+
             //Update daily transactions table
             DailyTransactions dailyTransactions = fetchDailyTransactionEntity();
             dailyTransactions.setTotalCredit(dailyTransactions.getTotalCredit().add(transaction.getAmountTransferred()));
             dailyTransactionsRepository.save(dailyTransactions);
+
+        } else {
+            Account account = transaction.getDestinationAccount();
+            transactionAlertService.sendTransactionDeclinedAlert(account, transaction.getAmountTransferred(), updatedLedgerTime);
         }
 
         List<LedgerEntry> existingLedgerEntries = new ArrayList<>(transaction.getLedgerEntries());
         existingLedgerEntries.forEach(transaction::removeLedger);
-
-        LocalDateTime updatedLedgerTime = LocalDateTime.now();
 
         //IT IS EITHER GOING TO BE SUCCESSFUL OR DECLINED NOW
         for (LedgerEntry ledgerEntry : existingLedgerEntries) {

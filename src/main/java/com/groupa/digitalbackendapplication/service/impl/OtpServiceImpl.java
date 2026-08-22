@@ -6,6 +6,7 @@ import com.groupa.digitalbackendapplication.domain.entities.Account;
 import com.groupa.digitalbackendapplication.domain.entities.Customer;
 import com.groupa.digitalbackendapplication.domain.entities.OtpVerification;
 import com.groupa.digitalbackendapplication.domain.enums.AccountStatus;
+import com.groupa.digitalbackendapplication.domain.enums.AccountTier;
 import com.groupa.digitalbackendapplication.domain.enums.OtpChannel;
 import com.groupa.digitalbackendapplication.domain.response.Response;
 import com.groupa.digitalbackendapplication.exceptions.BadRequestException;
@@ -134,7 +135,7 @@ public class OtpServiceImpl implements OtpService {
         accountRepository.save(account);
 
         try{
-            sendWelcomeEmail(customer.getFirstName(), customer.getEmail());
+            sendWelcomeEmail(customer.getFirstName(), customer.getEmail(), account.getAccountNumber(), account.getAccountTier());
         } catch (Exception e) {
             log.error("Welcome email failed to send {}: {}", customer.getEmail(), e.getMessage());
         }
@@ -151,7 +152,6 @@ public class OtpServiceImpl implements OtpService {
     @Transactional
     public Response<String> resendOtp(ResendOtpRequest request) {
         UUID customerId = request.getCustomerId();
-        Customer customer = customerRepository.findById(customerId).orElseThrow(() -> new ResourceNotFoundException("Customer not found"));
 
         Account account = accountRepository.findByOwnerId(customerId).orElseThrow(() -> new ResourceNotFoundException("Account not found"));
         if (account.getAccountStatus() == AccountStatus.ACTIVE) {
@@ -159,9 +159,14 @@ public class OtpServiceImpl implements OtpService {
         }
         return generateAndSendOtp(customerId, account);
     }
-    private void sendWelcomeEmail(String firstname, String email){
+    private void sendWelcomeEmail(String firstname, String email, String accountNumber, AccountTier accountTier) {
         String welcomeMessage = "Welcome, " + firstname + "!\n\n" +
                 "We are excited to have you on board at PAYEDGE DIGITAL BANKING. \n\n" +
+                "Your account has been successfully verified and activated!\n\n" +
+                "Below are your account details:\n\n" +
+                "Account Number: " + accountNumber + "\n" +
+                "Account Type: " + accountTier + "\n" +
+                "Currency: NGN\n\n" +
                 "Start enjoying seamless deposits, withdrawals, transfers and monthly statements. \n\n" +
                 "Your financial journey starts here!";
         EmailDetails emailDetails = EmailDetails.builder()

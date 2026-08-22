@@ -1,7 +1,5 @@
 package com.groupa.digitalbackendapplication.controller;
 
-import com.groupa.digitalbackendapplication.notification.EmailDetails;
-
 import com.groupa.digitalbackendapplication.domain.dto.request.ResendOtpRequest;
 import com.groupa.digitalbackendapplication.domain.dto.request.VerifyOtpRequest;
 import com.groupa.digitalbackendapplication.domain.dto.request.AdminCreationRequest;
@@ -12,8 +10,6 @@ import com.groupa.digitalbackendapplication.domain.request.LoginRequest;
 import com.groupa.digitalbackendapplication.domain.response.LoginResponse;
 import com.groupa.digitalbackendapplication.domain.response.LogoutResponse;
 import com.groupa.digitalbackendapplication.domain.response.Response;
-import com.groupa.digitalbackendapplication.notification.EmailDetails;
-import com.groupa.digitalbackendapplication.notification.EmailService;
 import com.groupa.digitalbackendapplication.service.AuthService;
 import com.groupa.digitalbackendapplication.service.OtpService;
 
@@ -32,8 +28,7 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
-    private final EmailService emailService;
-    private final OtpService otpService;
+        private final OtpService otpService;
 
     @PostMapping("/create-Admin")
     public ResponseWrapper<AdminCreationResponse> createAdmin(@Valid @RequestBody AdminCreationRequest payload){
