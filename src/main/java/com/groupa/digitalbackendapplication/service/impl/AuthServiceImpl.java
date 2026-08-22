@@ -1,7 +1,5 @@
 package com.groupa.digitalbackendapplication.service.impl;
 
-import com.groupa.digitalbackendapplication.domain.dto.response.CustomerDto;
-import com.groupa.digitalbackendapplication.domain.entities.Account;
 import com.groupa.digitalbackendapplication.domain.dto.request.AdminCreationRequest;
 import com.groupa.digitalbackendapplication.domain.dto.request.ForgetPasswordRequest;
 import com.groupa.digitalbackendapplication.domain.dto.response.AdminCreationResponse;
@@ -18,11 +16,11 @@ import com.groupa.digitalbackendapplication.domain.response.LogoutResponse;
 import com.groupa.digitalbackendapplication.domain.response.Response;
 import com.groupa.digitalbackendapplication.exceptions.BadRequestException;
 import com.groupa.digitalbackendapplication.exceptions.ResourceNotFoundException;
-import com.groupa.digitalbackendapplication.repository.AccountRepository;
+import com.groupa.digitalbackendapplication.notification.EmailDetails;
+import com.groupa.digitalbackendapplication.notification.EmailService;
 import com.groupa.digitalbackendapplication.repository.AdminRepository;
 import com.groupa.digitalbackendapplication.repository.AuditLogRepository;
 import com.groupa.digitalbackendapplication.repository.CustomerRepository;
-import com.groupa.digitalbackendapplication.repository.UserRepository;
 import com.groupa.digitalbackendapplication.security.AuthUser;
 import com.groupa.digitalbackendapplication.security.CustomUserDetailsService;
 import com.groupa.digitalbackendapplication.security.TokenService;
@@ -57,6 +55,8 @@ public class AuthServiceImpl implements AuthService {
     private final LoginSessionService loginSessionService;
     private final AdminRepository adminRepository;
     private final AdminService adminService;
+    private final EmailService emailService;
+
     private final AuditLogRepository auditLogRepository;
 
     @Override
@@ -91,6 +91,24 @@ public class AuthServiceImpl implements AuthService {
                 new UsernamePasswordAuthenticationToken(authUser, null, authUser.getAuthorities());
 
         SecurityContextHolder.getContext().setAuthentication(authenticationToken);
+
+        Customer customer = customerRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("Customer not found"));
+
+        EmailDetails emailDetails = EmailDetails.builder()
+                .recipient(customer.getEmail())
+                .subject("New Login to your PAYEDGE Digital Bank Account")
+                .messageBody(
+                        "Dear " + customer.getFirstName() + ",\n\n" +
+                        "A successful login to your PAYEDGE Digital Banking account " +
+                        "was detected.\n\n" +
+                        "If this was you, no action is required.\n\n" +
+                        "If you did not perform this login, please contact " +
+                        "our support team immediately.\n\n " +
+                        "Regards,\n" +
+                        "PAYEDGE TEAM"
+                )
+                .build();
+        emailService.sendEmail(emailDetails);
 
         LoginResponse loginResponse = LoginResponse.builder()
                 .role(role)
