@@ -16,8 +16,10 @@ public interface AdminService {
 
     ResponseWrapper<AdminCreationResponse> createAdmin(AdminCreationRequest payload);
     ResponseWrapper<AdminDto> getAdminProfile();
-    Response<CustomerDto> getCustomerProfile(UUID customerId);
+    Response<CustomerDto> getCustomerProfile(String accountNumber);
+    ResponseWrapper<Page<CustomerDto>> getAllCustomer(Pageable pageable);
     ResponseWrapper<TransactionHistoryResponseDto> getTransactionById(UUID transactionId);
+    ResponseWrapper<List<TransactionHistoryResponseDto>> getCustomerTransactions(String accountNumber);
     ResponseWrapper<Page<KycDto>> fetchAllPendingKyc(Pageable pageable);
     ResponseWrapper<KycDto> fetchPendingKycById(UUID id);
     ResponseWrapper<KycResolveResponse> approveKyc(UUID kycId);
@@ -25,5 +27,5 @@ public interface AdminService {
     ResponseWrapper<String> suspendAccount(AccountSuspensionRequest payload);
     ResponseWrapper<String> reactivateAccount(UUID accountId);
     ResponseWrapper<BankOverviewDto> getOverview();
-    ResponseWrapper<List<AuditLog>> getAuditLogs();
+    ResponseWrapper<Page<AuditLog>> getAuditLogs(int pageNumber, int pageSize);
 }

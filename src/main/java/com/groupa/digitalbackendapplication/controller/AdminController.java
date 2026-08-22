@@ -75,15 +75,30 @@ public class AdminController {
     }
 
     @Operation(security = @SecurityRequirement(name = "bearerAuth"))
-    @GetMapping("/customer-profile/{customer-id}")
-    public Response<CustomerDto> getCustomerProfileById(@PathVariable("customer-id") UUID id){
-        return adminService.getCustomerProfile(id);
+    @GetMapping("/customer-profile/{account-number}")
+    public Response<CustomerDto> getCustomerProfileById(@PathVariable("account-number") String accountNumber){
+        return adminService.getCustomerProfile(accountNumber);
+    }
+
+    @Operation(security = @SecurityRequirement(name = "bearerAuth"))
+    @GetMapping("/customers")
+    public ResponseWrapper<Page<CustomerDto>> getAllCustomer(
+            @RequestParam(defaultValue = "0")  int     page,
+            @RequestParam(defaultValue = "10") int     size){
+        Pageable pageable = PageRequest.of(page, size);
+        return adminService.getAllCustomer(pageable);
     }
 
     @Operation(security = @SecurityRequirement(name = "bearerAuth"))
     @GetMapping("/transaction/{transaction-id}")
     public ResponseWrapper<TransactionHistoryResponseDto> getTransactionById(@PathVariable("transaction-id") UUID id){
         return adminService.getTransactionById(id);
+    }
+
+    @Operation(security = @SecurityRequirement(name = "bearerAuth"))
+    @GetMapping("/customer-transactions/{account-number}")
+    public ResponseWrapper<List<TransactionHistoryResponseDto>> getCustomerTransactions(@PathVariable("account-number") String accountNumber){
+        return adminService.getCustomerTransactions(accountNumber);
     }
     @Operation(security = @SecurityRequirement(name = "bearerAuth"))
     @GetMapping("/stats")
@@ -93,7 +108,10 @@ public class AdminController {
 
     @Operation(security = @SecurityRequirement(name = "bearerAuth"))
     @GetMapping("/get-all-audit-logs")
-    public ResponseWrapper<List<AuditLog>> getAllAuditLogs() {
-        return adminService.getAuditLogs();
+    public ResponseWrapper<Page<AuditLog>> getAllAuditLogs(
+            @RequestParam(required = false, defaultValue = "1") int pageNumber,
+            @RequestParam(required = false, defaultValue = "20") int pageSize
+    ) {
+        return adminService.getAuditLogs(pageNumber, pageSize);
     }
 }

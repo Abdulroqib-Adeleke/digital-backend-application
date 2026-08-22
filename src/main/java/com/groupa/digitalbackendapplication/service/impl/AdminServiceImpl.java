@@ -23,18 +23,17 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Period;
-import java.util.List;
-import java.util.Locale;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -52,6 +51,7 @@ public class AdminServiceImpl implements AdminService {
     private final SecurityUtil securityUtil;
     private final CustomerService customerService;
     private final TransactionService transactionService;
+    private final TransactionRepository transactionRepository;
     private final AuditLogRepository auditLogRepository;
 
 
@@ -97,6 +97,16 @@ public class AdminServiceImpl implements AdminService {
 
         AdminDto dto = buildAdminDto(admin);
 
+        // save audit log
+        auditLogRepository.save(
+                AuditLog.builder()
+                        .actionType(ActionType.USER_PROFILE_FETCHED)
+                        .userId(admin.getId())
+                        .userEmail(admin.getEmail())
+                        .timeOfCreation(LocalDateTime.now())
+                        .entityType("admin")
+                        .build());
+
         return ResponseWrapper.<AdminDto>builder()
                 .data(dto)
                 .message("Fetch admin profile successfully")
@@ -105,13 +115,65 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
-    public Response<CustomerDto> getCustomerProfile(UUID customerId) {
-        return customerService.getUserProfileById(customerId);
+    public Response<CustomerDto> getCustomerProfile(String accountNumber) {
+        Account account = accountRepository.findByAccountNumber(accountNumber)
+                .orElseThrow(()-> new ResourceNotFoundException("Account not found"));
+
+        return customerService.getUserProfileById(account.getOwnerId());
+    }
+
+    @Override
+    public ResponseWrapper<Page<CustomerDto>> getAllCustomer(Pageable pageable) {
+        Page<Account> accountPage = accountRepository.findAll(pageable);
+
+        List<CustomerDto> dtos = buildPageCustomer(accountPage);
+
+        Page<CustomerDto> pageCustomer = new PageImpl<>(dtos, pageable, accountPage.getTotalElements());
+
+        return ResponseWrapper.<Page<CustomerDto>>builder()
+                .data(pageCustomer)
+                .message("successful")
+                .statusCode(HttpStatus.OK)
+                .build();
     }
 
     @Override
     public ResponseWrapper<TransactionHistoryResponseDto> getTransactionById(UUID transactionId) {
+        // save audit log
+        User user = securityUtil.getSecurityPrincipal().getUser();
+        auditLogRepository.save(
+                AuditLog.builder()
+                        .actionType(ActionType.TRANSACTION_FETCHED)
+                        .userId(user.getId())
+                        .userEmail(user.getEmail())
+                        .timeOfCreation(LocalDateTime.now())
+                        .entityType("transactions")
+                        .build());
         return transactionService.getTransactionById(transactionId);
+    }
+
+    @Override
+    public ResponseWrapper<List<TransactionHistoryResponseDto>> getCustomerTransactions(String accountNumber) {
+        Account account = accountRepository.findByAccountNumber(accountNumber)
+                .orElseThrow(() -> new ResourceNotFoundException("Account not found"));
+
+        List<TransactionHistoryResponseDto> transactions = transactionRepository.findAllByAccount(account)
+                .stream()
+                .map(t -> new TransactionHistoryResponseDto(
+                        t.getId(),
+                        t.getTransactionType(),
+                        t.getTransactionStatus(),
+                        t.getSourceAccount() != null ? t.getSourceAccount().getAccountNumber() : null,
+                        t.getAmountTransferred(),
+                        t.getDescription(),
+                        t.getCreatedAt()))
+                .toList();
+
+        return ResponseWrapper.<List<TransactionHistoryResponseDto>>builder()
+                .data(transactions)
+                .message("Transactions fetched")
+                .statusCode(HttpStatus.OK)
+                .build();
     }
 
     @Override
@@ -133,6 +195,17 @@ public class AdminServiceImpl implements AdminService {
 
         Page<KycDto> pagedKyc = new PageImpl<>(dtos, pageable,kycEntityPage.getTotalElements());
 
+        // save audit log
+        User user = securityUtil.getSecurityPrincipal().getUser();
+        auditLogRepository.save(
+                AuditLog.builder()
+                        .actionType(ActionType.PENDING_KYC_FETCHED)
+                        .userId(user.getId())
+                        .userEmail(user.getEmail())
+                        .timeOfCreation(LocalDateTime.now())
+                        .entityType("kyc_entities")
+                        .build());
+
         return ResponseWrapper.<Page<KycDto>>builder()
                 .data(pagedKyc)
                 .message("successful")
@@ -147,6 +220,18 @@ public class AdminServiceImpl implements AdminService {
 
         KycDto dto = buildKycDto(kyc.getAccountId(), kyc.getCustomerId(), kyc.getId(), kyc.getDocumentType(),
                 kyc.getSubmittedValue(), kyc.getResultingTier(), kyc.getStatus(), kyc.getSubmittedAt());
+
+        // save audit log
+        User user = securityUtil.getSecurityPrincipal().getUser();
+        auditLogRepository.save(
+                AuditLog.builder()
+                        .actionType(ActionType.PENDING_KYC_FETCHED)
+                        .userId(user.getId())
+                        .userEmail(user.getEmail())
+                        .timeOfCreation(LocalDateTime.now())
+                        .entityType("kyc_entities")
+                        .build());
+
         return ResponseWrapper.<KycDto>builder()
                 .data(dto)
                 .message("fetch successfully")
@@ -181,6 +266,17 @@ public class AdminServiceImpl implements AdminService {
             log.error("Kyc Approval email failed to send to {}: {}", customer.getEmail(), e.getMessage());
         }
 
+        // save audit log
+        User user = securityUtil.getSecurityPrincipal().getUser();
+        auditLogRepository.save(
+                AuditLog.builder()
+                        .actionType(ActionType.KYC_APPROVED)
+                        .userId(user.getId())
+                        .userEmail(user.getEmail())
+                        .timeOfCreation(LocalDateTime.now())
+                        .entityType("kyc_entities")
+                        .build());
+
         return ResponseWrapper.<KycResolveResponse>builder()
                 .data(response)
                 .message("Kyc has Been approved")
@@ -211,6 +307,17 @@ public class AdminServiceImpl implements AdminService {
         } catch (Exception e){
             log.error("Kyc rejection email failed to send to {}: {}", customer.getEmail(), e.getMessage());
         }
+
+        // save audit log
+        User user = securityUtil.getSecurityPrincipal().getUser();
+        auditLogRepository.save(
+                AuditLog.builder()
+                        .actionType(ActionType.KYC_REJECTED)
+                        .userId(user.getId())
+                        .userEmail(user.getEmail())
+                        .timeOfCreation(LocalDateTime.now())
+                        .entityType("kyc_entities")
+                        .build());
 
         return ResponseWrapper.<KycResolveResponse>builder()
                 .data(response)
@@ -244,6 +351,17 @@ public class AdminServiceImpl implements AdminService {
             log.error("Suspension email failed to send to {}: {}", customer.getEmail(), e.getMessage());
         }
 
+        // save audit log
+        User user = securityUtil.getSecurityPrincipal().getUser();
+        auditLogRepository.save(
+                AuditLog.builder()
+                        .actionType(ActionType.ACCOUNT_SUSPENDED)
+                        .userId(user.getId())
+                        .userEmail(user.getEmail())
+                        .timeOfCreation(LocalDateTime.now())
+                        .entityType("accounts")
+                        .build());
+
         return ResponseWrapper.<String>builder()
                 .data(AccountStatus.FROZEN.name())
                 .message("Account successfully frozen")
@@ -275,6 +393,17 @@ public class AdminServiceImpl implements AdminService {
             log.error("Reactivation email failed to send to {}: {}", customer.getEmail(), e.getMessage());
         }
 
+        // save audit log
+        User user = securityUtil.getSecurityPrincipal().getUser();
+        auditLogRepository.save(
+                AuditLog.builder()
+                        .actionType(ActionType.ACCOUNT_UNSUSPENDED)
+                        .userId(user.getId())
+                        .userEmail(user.getEmail())
+                        .timeOfCreation(LocalDateTime.now())
+                        .entityType("accounts")
+                        .build());
+
         return ResponseWrapper.<String>builder()
                 .data(AccountStatus.ACTIVE.name())
                 .message("Account reactivated successfully")
@@ -287,6 +416,17 @@ public class AdminServiceImpl implements AdminService {
     public ResponseWrapper<BankOverviewDto> getOverview() {
         BankOverviewDto dto = buildOverview();
 
+        // save audit log
+        User user = securityUtil.getSecurityPrincipal().getUser();
+        auditLogRepository.save(
+                AuditLog.builder()
+                        .actionType(ActionType.BANK_OVERVIEW)
+                        .userId(user.getId())
+                        .userEmail(user.getEmail())
+                        .timeOfCreation(LocalDateTime.now())
+                        .entityType("accounts")
+                        .build());
+
         return ResponseWrapper.<BankOverviewDto>builder()
                 .data(dto)
                 .message("Fetched bank stat")
@@ -295,13 +435,15 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
-    public ResponseWrapper<List<AuditLog>> getAuditLogs() {
-        List<AuditLog> auditLogs = auditLogRepository.findAll();
-        return ResponseWrapper
-                .<List<AuditLog>>builder()
-                .statusCode(HttpStatus.OK)
+    public ResponseWrapper<Page<AuditLog>> getAuditLogs(int pageNumber, int pageSize) {
+        Pageable pageable = PageRequest.of(pageNumber - 1, pageSize);
+
+        Page<AuditLog> auditLogs = auditLogRepository.findAll(pageable);
+
+        return ResponseWrapper.<Page<AuditLog>>builder()
                 .data(auditLogs)
                 .message("Success")
+                .statusCode(HttpStatus.OK)
                 .build();
     }
 
@@ -338,6 +480,15 @@ public class AdminServiceImpl implements AdminService {
                 .address(address)
                 .build();
         Admin savedAdmin = adminRepository.save(admin);
+        // save audit log
+        auditLogRepository.save(
+                AuditLog.builder()
+                        .actionType(ActionType.ADMIN_REGISTRATION)
+                        .userId(savedAdmin.getId())
+                        .userEmail(savedAdmin.getEmail())
+                        .timeOfCreation(LocalDateTime.now())
+                        .entityType("admin")
+                        .build());
         return new AdminCreationResponse(savedAdmin.getFirstName(), adminId);
     }
 
@@ -449,6 +600,43 @@ public class AdminServiceImpl implements AdminService {
                 .totalTier3Account(totalTierAccount(AccountTier.TIER_3))
                 .build();
 
+    }
+
+    private List<CustomerDto> buildPageCustomer(Page<Account> accountPage){
+
+        List<Account> accounts = accountPage.getContent();
+
+        List<CustomerDto> dtos = new ArrayList<>();
+
+        for (Account account : accounts) {
+            Customer customer = customerRepository.findById(account.getOwnerId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Customer not found"));
+
+            AccountDto accountDto = AccountDto.builder()
+                    .id(account.getId())
+                    .accountNumber(account.getAccountNumber())
+                    .balance(account.getBalance())
+                    .accountTier(account.getAccountTier())
+                    .accountStatus(account.getAccountStatus())
+                    .build();
+
+            CustomerDto customerDto = CustomerDto.builder()
+                    .id(customer.getId())
+                    .firstName(customer.getFirstName())
+                    .lastName(customer.getLastName())
+                    .email(customer.getEmail())
+                    .phoneNumber(customer.getPhoneNumber())
+                    .gender(customer.getGender())
+                    .dateOfBirth(customer.getDateOfBirth())
+                    .role(customer.getRole())
+                    .address(customer.getAddress())
+                    .nin(encryptionUtil.decrypt(customer.getNin()))
+                    .bvn(encryptionUtil.decrypt(customer.getBvn()))
+                    .accountDto(accountDto)
+                    .build();
+            dtos.add(customerDto);
+        }
+        return dtos;
     }
 
 }
