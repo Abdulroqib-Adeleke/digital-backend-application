@@ -14,8 +14,8 @@ import java.util.UUID;
 @Builder
 
 public class VerifyOtpRequest {
-    @NotNull(message = "Customer ID cannot be null")
-    private UUID customerId;
+    @NotNull(message = "Account number cannot be null")
+    private String accountNumber;
 
     @NotBlank(message = "OTP cannot be empty")
     @Pattern(regexp = "\\d{6}", message = "OTP must be a 6-digit number")

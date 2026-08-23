@@ -73,6 +73,7 @@ public class OtpServiceImpl implements OtpService {
 
         OtpVerification otpVerification = OtpVerification.builder()
                 .customerId(customerId)
+                .accountNumber(account.getAccountNumber())
                 .otpHash(otpHash)
                 .expiresAt(LocalDateTime.now().plusMinutes(OTP_EXPIRY_MINUTES))
                 .attemptCount(0)
@@ -97,19 +98,17 @@ public class OtpServiceImpl implements OtpService {
 
     @Override
     public Response<String> verifyOtp(VerifyOtpRequest request) {
-
-        UUID customerId = request.getCustomerId();
-        Customer customer = customerRepository.findById(customerId)
-                .orElseThrow(() -> new ResourceNotFoundException("Customer not found"));
-
-        Account account = accountRepository.findByOwnerId(customerId)
+        Account account = accountRepository.findByAccountNumber(request.getAccountNumber())
                 .orElseThrow(() -> new ResourceNotFoundException("Account not found"));
+
+        Customer customer = customerRepository.findById(account.getOwnerId())
+                .orElseThrow(() -> new ResourceNotFoundException("Customer not found"));
 
         if (account.getAccountStatus() == AccountStatus.ACTIVE) {
             throw new BadRequestException("Account is already active.");
         }
 
-        OtpVerification otpVerification = otpVerificationRepository.findLatestByCustomerId(customerId).orElseThrow(() -> new ResourceNotFoundException("No Otp found. Please request a new OTP"));
+        OtpVerification otpVerification = otpVerificationRepository.findLatestByCustomerId(request.getAccountNumber()).orElseThrow(() -> new ResourceNotFoundException("No Otp found. Please request a new OTP"));
 
         if (otpVerification.getVerifiedAt() !=null){
             throw new BadRequestException("Otp has already been used.");
@@ -140,7 +139,7 @@ public class OtpServiceImpl implements OtpService {
             log.error("Welcome email failed to send {}: {}", customer.getEmail(), e.getMessage());
         }
 
-        log.info("Customer {} successfully verified OTP", customerId);
+        log.info("Customer {} successfully verified OTP", customer.getId());
         return Response.<String>builder()
                 .statusCode(HttpStatus.OK.value())
                 .message("OTP verification successful")
@@ -151,9 +150,10 @@ public class OtpServiceImpl implements OtpService {
     @Override
     @Transactional
     public Response<String> resendOtp(ResendOtpRequest request) {
-        UUID customerId = request.getCustomerId();
+        Account account = accountRepository.findByAccountNumber(request.getAccountNumber())
+                .orElseThrow(() -> new ResourceNotFoundException("Account not found"));
+        UUID customerId = account.getOwnerId();
 
-        Account account = accountRepository.findByOwnerId(customerId).orElseThrow(() -> new ResourceNotFoundException("Account not found"));
         if (account.getAccountStatus() == AccountStatus.ACTIVE) {
             throw new BadRequestException("Account is already active.");
         }
