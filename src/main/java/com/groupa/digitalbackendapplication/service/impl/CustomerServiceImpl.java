@@ -12,15 +12,16 @@ import com.groupa.digitalbackendapplication.domain.enums.Gender;
 import com.groupa.digitalbackendapplication.domain.enums.Role;
 import com.groupa.digitalbackendapplication.domain.entities.User;
 import com.groupa.digitalbackendapplication.domain.enums.*;
+import com.groupa.digitalbackendapplication.domain.response.LogoutResponse;
 import com.groupa.digitalbackendapplication.domain.response.Response;
 import com.groupa.digitalbackendapplication.exceptions.BadRequestException;
 import com.groupa.digitalbackendapplication.exceptions.ResourceNotFoundException;
+import com.groupa.digitalbackendapplication.notification.EmailService;
 import com.groupa.digitalbackendapplication.repository.AccountRepository;
 import com.groupa.digitalbackendapplication.repository.AuditLogRepository;
 import com.groupa.digitalbackendapplication.repository.CustomerRepository;
 import com.groupa.digitalbackendapplication.security.AuthUser;
-import com.groupa.digitalbackendapplication.service.CustomerService;
-import com.groupa.digitalbackendapplication.service.OtpService;
+import com.groupa.digitalbackendapplication.service.*;
 import com.groupa.digitalbackendapplication.utils.AccountUtil;
 import com.groupa.digitalbackendapplication.utils.LoginSessionUtil;
 import com.groupa.digitalbackendapplication.utils.EncryptionUtil;
@@ -29,6 +30,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -52,9 +54,10 @@ public class CustomerServiceImpl implements CustomerService {
     private final LoginSessionUtil loginSessionUtil;
     private final SecurityUtil securityUtil;
     private final EncryptionUtil encryptionUtil;
-    private final EmailService emailService;
     private final AuditLogRepository auditLogRepository;
     private final OtpService otpService;
+    private final LoginSessionService loginSessionService;
+    private final RefreshSessionService refreshSessionService;
 
     @Override
     public ResponseWrapper<AccountCreatedResponse> createPersonalAccount(CustomerRegistrationRequest payload) {
@@ -198,8 +201,10 @@ public class CustomerServiceImpl implements CustomerService {
                         .entityType("customer")
                         .build());
 
+        logout();
+
         return ResponseWrapper.<String>builder()
-                .message("Password reset successful")
+                .message("Password reset successful, please login with the new password")
                 .statusCode(HttpStatus.ACCEPTED)
                 .build();
     }
@@ -247,5 +252,28 @@ public class CustomerServiceImpl implements CustomerService {
     private boolean validatePhoneNumber(String phoneNumber){
         Optional<Customer> customerOptional = customerRepository.findByPhoneNumber(phoneNumber);
         return customerOptional.isPresent();
+    }
+
+    private void logout(){
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+        AuthUser authUser = (AuthUser) authentication.getPrincipal();
+        UUID userId = authUser.getUser().getId();
+
+        loginSessionService.invalidateLoginSession(userId);
+
+        refreshSessionService.invalidateLoginSession(userId);
+
+        LogoutResponse logoutResponse = new LogoutResponse("Logout Successful");
+
+        // save audit log
+        auditLogRepository.save(
+                AuditLog.builder()
+                        .actionType(ActionType.USER_LOGOUT)
+                        .userId(userId)
+                        .userEmail(authUser.getUser().getEmail())
+                        .timeOfCreation(LocalDateTime.now())
+                        .entityType("user")
+                        .build());
     }
 }

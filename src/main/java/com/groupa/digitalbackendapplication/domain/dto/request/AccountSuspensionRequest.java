@@ -6,8 +6,8 @@ import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
 
 public record AccountSuspensionRequest(
-    @NotNull(message = "account id cannot be blank")
-    UUID accountId,
+    @NotNull(message = "account number cannot be blank")
+    String accountNumber,
 
     @NotBlank(message = "reason cannot be blank")
     String suspensionReason)

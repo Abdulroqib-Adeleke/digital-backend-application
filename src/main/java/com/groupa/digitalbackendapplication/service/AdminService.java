@@ -21,11 +21,11 @@ public interface AdminService {
     ResponseWrapper<TransactionHistoryResponseDto> getTransactionById(UUID transactionId);
     ResponseWrapper<List<TransactionHistoryResponseDto>> getCustomerTransactions(String accountNumber);
     ResponseWrapper<Page<KycDto>> fetchAllPendingKyc(Pageable pageable);
-    ResponseWrapper<KycDto> fetchPendingKycById(UUID id);
+    ResponseWrapper<KycDto> fetchPendingKycByAccountNumber(String payload);
     ResponseWrapper<KycResolveResponse> approveKyc(UUID kycId);
     ResponseWrapper<KycResolveResponse> rejectKyc(KycRejectionRequest payload);
     ResponseWrapper<String> suspendAccount(AccountSuspensionRequest payload);
-    ResponseWrapper<String> reactivateAccount(UUID accountId);
+    ResponseWrapper<String> reactivateAccount(String accountNumber);
     ResponseWrapper<BankOverviewDto> getOverview();
     ResponseWrapper<Page<AuditLog>> getAuditLogs(int pageNumber, int pageSize);
 }
