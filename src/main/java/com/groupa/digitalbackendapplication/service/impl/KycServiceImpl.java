@@ -74,7 +74,13 @@ public class KycServiceImpl implements KycService {
             resultingTier = AccountTier.TIER_2;
         else if(payload.getDocumentType().equals(KycDocumentType.BVN) && tier.equals(AccountTier.TIER_2))
             resultingTier = AccountTier.TIER_3;
-        else throw new BadRequestException("Invalid document to upgrade tier");
+        else{
+            AccountTier errorTier =
+                    (payload.getDocumentType().equals(KycDocumentType.BVN) &&
+                            account.getAccountTier().equals(AccountTier.TIER_1)) ?
+                            AccountTier.TIER_2 : AccountTier.TIER_3;
+            throw new BadRequestException("Invalid document to upgrade to " + errorTier);
+        }
 
         KycSubmissionResponse message = buildKycEntity(customer.getId(),account.getId(),payload.getDocumentType(),
                 payload.getSubmittedValue(),KycStatus.PENDING, null, resultingTier);

@@ -46,9 +46,9 @@ public class AdminController {
     }
 
     @Operation(security = @SecurityRequirement(name = "bearerAuth"))
-    @GetMapping("/fetch-pending-kyc-by-id/{account-id}")
-    public ResponseWrapper<KycDto> fetchPendingKycById(@PathVariable("account-id") UUID payload){
-        return adminService.fetchPendingKycById(payload);
+    @GetMapping("/fetch-pending-kyc-by-account-number/{account-number}")
+    public ResponseWrapper<KycDto> fetchPendingKycByAccountNumber(@PathVariable("account-number") String payload){
+        return adminService.fetchPendingKycByAccountNumber(payload);
     }
 
     @Operation(security = @SecurityRequirement(name = "bearerAuth"))
@@ -69,9 +69,9 @@ public class AdminController {
         return adminService.suspendAccount(payload);
     }
     @Operation(security = @SecurityRequirement(name = "bearerAuth"))
-    @PatchMapping("/reactivate-account/{account-id}")
-    public ResponseWrapper<String> reactivateAccount(@PathVariable("account-id") UUID id){
-        return adminService.reactivateAccount(id);
+    @PatchMapping("/reactivate-account/{account-number}")
+    public ResponseWrapper<String> reactivateAccount(@PathVariable("account-number") String accountNumber){
+        return adminService.reactivateAccount(accountNumber);
     }
 
     @Operation(security = @SecurityRequirement(name = "bearerAuth"))

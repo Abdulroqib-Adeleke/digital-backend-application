@@ -4,11 +4,8 @@ import com.groupa.digitalbackendapplication.domain.dto.request.AdminCreationRequ
 import com.groupa.digitalbackendapplication.domain.dto.request.ForgetPasswordRequest;
 import com.groupa.digitalbackendapplication.domain.dto.response.AdminCreationResponse;
 import com.groupa.digitalbackendapplication.domain.dto.response.ResponseWrapper;
-import com.groupa.digitalbackendapplication.domain.entities.Admin;
-import com.groupa.digitalbackendapplication.domain.entities.AuditLog;
-import com.groupa.digitalbackendapplication.domain.entities.Customer;
+import com.groupa.digitalbackendapplication.domain.entities.*;
 import com.groupa.digitalbackendapplication.domain.enums.AccountStatus;
-import com.groupa.digitalbackendapplication.domain.entities.User;
 import com.groupa.digitalbackendapplication.domain.enums.ActionType;
 import com.groupa.digitalbackendapplication.domain.request.LoginRequest;
 import com.groupa.digitalbackendapplication.domain.response.LoginResponse;
@@ -18,6 +15,7 @@ import com.groupa.digitalbackendapplication.exceptions.BadRequestException;
 import com.groupa.digitalbackendapplication.exceptions.ResourceNotFoundException;
 import com.groupa.digitalbackendapplication.notification.EmailDetails;
 import com.groupa.digitalbackendapplication.notification.EmailService;
+import com.groupa.digitalbackendapplication.repository.AccountRepository;
 import com.groupa.digitalbackendapplication.repository.AdminRepository;
 import com.groupa.digitalbackendapplication.repository.AuditLogRepository;
 import com.groupa.digitalbackendapplication.repository.CustomerRepository;
@@ -56,6 +54,7 @@ public class AuthServiceImpl implements AuthService {
     private final AdminRepository adminRepository;
     private final AdminService adminService;
     private final EmailService emailService;
+    private final AccountRepository accountRepository;
 
     private final AuditLogRepository auditLogRepository;
 
@@ -71,9 +70,16 @@ public class AuthServiceImpl implements AuthService {
 
         AuthUser authUser = (AuthUser) customUserDetailsService.loadUserByUsername(email);
 
+        Account account = accountRepository.findByOwnerId(authUser.getUser().getId())
+                .orElseThrow(()-> new BadRequestException("Something went wrong"));
+
         if (!passwordEncoder.matches(password, authUser.getPassword())) {
             throw new BadRequestException("Password does not match");
         }
+        if(account.getAccountStatus() == AccountStatus.PENDING_VERIFICATION)
+            throw new BadRequestException("Please verify account before logging in");
+        if(account.getAccountStatus() == AccountStatus.FROZEN)
+            throw new BadRequestException("Account suspended, contact admin to rectify");
 
         String role = authUser.getUser().getRole().name();
         UUID userId = authUser.getUser().getId();

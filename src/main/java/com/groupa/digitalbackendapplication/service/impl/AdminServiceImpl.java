@@ -214,8 +214,11 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
-    public ResponseWrapper<KycDto> fetchPendingKycById(UUID id) {
-        KycEntity kyc = kycEntityRepository.findByAccountIdAndStatus(id, KycStatus.PENDING)
+    public ResponseWrapper<KycDto> fetchPendingKycByAccountNumber(String payload) {
+        Account account = accountRepository.findByAccountNumber(payload)
+                .orElseThrow(()-> new ResourceNotFoundException("Account not found"));
+
+        KycEntity kyc = kycEntityRepository.findByAccountIdAndStatus(account.getId(), KycStatus.PENDING)
                 .orElseThrow(()->new ResourceNotFoundException("No pending kyc with the provided id"));
 
         KycDto dto = buildKycDto(kyc.getAccountId(), kyc.getCustomerId(), kyc.getId(), kyc.getDocumentType(),
@@ -329,7 +332,7 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     public ResponseWrapper<String> suspendAccount(AccountSuspensionRequest payload) {
-        Account account = accountRepository.findById(payload.accountId())
+        Account account = accountRepository.findByAccountNumber(payload.accountNumber())
                 .orElseThrow(()-> new ResourceNotFoundException("Account not found"));
 
         if(account.getAccountStatus() == AccountStatus.FROZEN)
@@ -370,8 +373,8 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
-    public ResponseWrapper<String> reactivateAccount(UUID accountId) {
-        Account account = accountRepository.findById(accountId)
+    public ResponseWrapper<String> reactivateAccount(String accountNumber) {
+        Account account = accountRepository.findByAccountNumber(accountNumber)
                 .orElseThrow(()-> new ResourceNotFoundException("Account not found"));
 
         if(account.getAccountStatus() == AccountStatus.ACTIVE)
