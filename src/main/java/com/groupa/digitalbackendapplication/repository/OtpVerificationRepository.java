@@ -16,4 +16,11 @@ public interface OtpVerificationRepository extends JpaRepository<OtpVerification
             AND o.verifiedAt is NULL 
             ORDER BY o.createdAt DESC""")
     Optional<OtpVerification> findLatestByCustomerId(UUID customerId);
+
+    @Query("""
+            SELECT o FROM OtpVerification o 
+            WHERE o.accountNumber = :accountNumber 
+            AND o.verifiedAt is NULL 
+            ORDER BY o.createdAt DESC""")
+    Optional<OtpVerification> findLatestByCustomerId(String accountNumber);
 }

@@ -23,6 +23,9 @@ public class OtpVerification {
     @Column(name = "customer_id", nullable = false)
     private UUID customerId;
 
+    @Column(name = "account_number", nullable = false)
+    private String accountNumber;
+
     @Column(name = "otp_hash", nullable = false)
     private String otpHash;
 

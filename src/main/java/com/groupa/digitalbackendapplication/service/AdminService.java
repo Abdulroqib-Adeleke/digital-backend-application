@@ -28,4 +28,5 @@ public interface AdminService {
     ResponseWrapper<String> reactivateAccount(String accountNumber);
     ResponseWrapper<BankOverviewDto> getOverview();
     ResponseWrapper<Page<AuditLog>> getAuditLogs(int pageNumber, int pageSize);
+    ResponseWrapper<Page<TransactionHistoryResponseDto>> getAllTransactions(Pageable pageable);
 }

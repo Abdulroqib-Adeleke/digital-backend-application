@@ -450,6 +450,27 @@ public class AdminServiceImpl implements AdminService {
                 .build();
     }
 
+    @Override
+    public ResponseWrapper<Page<TransactionHistoryResponseDto>> getAllTransactions(Pageable pageable) {
+        Page<Transaction> allTransaction = transactionRepository.findAll(pageable);
+
+        List<TransactionHistoryResponseDto> transactionList = allTransaction.stream()
+                .map(transaction -> {
+                    return new TransactionHistoryResponseDto(transaction.getId(), transaction.getTransactionType(), transaction.getTransactionStatus(),
+                            transaction.getSourceAccount().getAccountNumber(), transaction.getAmountTransferred(),
+                            transaction.getDescription(), transaction.getCreatedAt());
+                })
+                .toList();
+
+
+        Page<TransactionHistoryResponseDto> paged = new PageImpl<>(transactionList, pageable, allTransaction.getTotalElements());
+        return ResponseWrapper.<Page<TransactionHistoryResponseDto>>builder()
+                .data(paged)
+                .message("Transactions fetched")
+                .statusCode(HttpStatus.OK)
+                .build();
+    }
+
 
     private String buildAdminId(){
         String id = "AD0001";

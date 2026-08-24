@@ -114,4 +114,14 @@ public class AdminController {
     ) {
         return adminService.getAuditLogs(pageNumber, pageSize);
     }
+
+    @Operation(security = @SecurityRequirement(name = "bearerAuth"))
+    @GetMapping("/get-all-transactions")
+    public ResponseWrapper<Page<TransactionHistoryResponseDto>> getAllTransactions(
+            @RequestParam(defaultValue = "0")  int     page,
+            @RequestParam(defaultValue = "10") int     size){
+        Pageable pageable = PageRequest.of(page, size);
+
+        return adminService.getAllTransactions(pageable);
+    }
 }

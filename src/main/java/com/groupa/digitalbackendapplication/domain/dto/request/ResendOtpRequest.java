@@ -13,5 +13,5 @@ import java.util.UUID;
 
 public class ResendOtpRequest {
     @NotNull(message = "Customer ID cannot be null")
-    private UUID customerId;
+    private String accountNumber;
 }
