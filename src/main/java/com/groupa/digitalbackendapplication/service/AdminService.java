@@ -21,7 +21,7 @@ public interface AdminService {
     ResponseWrapper<TransactionHistoryResponseDto> getTransactionById(UUID transactionId);
     ResponseWrapper<List<TransactionHistoryResponseDto>> getCustomerTransactions(String accountNumber);
     ResponseWrapper<Page<KycDto>> fetchAllPendingKyc(Pageable pageable);
-    ResponseWrapper<KycDto> fetchPendingKycByAccountNumber(String payload);
+    ResponseWrapper<KycDto> fetchPendingKycByAccountId(UUID payload);
     ResponseWrapper<KycResolveResponse> approveKyc(UUID kycId);
     ResponseWrapper<KycResolveResponse> rejectKyc(KycRejectionRequest payload);
     ResponseWrapper<String> suspendAccount(AccountSuspensionRequest payload);

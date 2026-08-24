@@ -1,7 +1,6 @@
 package com.groupa.digitalbackendapplication.controller;
 
 import com.groupa.digitalbackendapplication.domain.dto.request.AccountSuspensionRequest;
-import com.groupa.digitalbackendapplication.domain.dto.request.AdminCreationRequest;
 import com.groupa.digitalbackendapplication.domain.dto.request.KycRejectionRequest;
 import com.groupa.digitalbackendapplication.domain.dto.response.*;
 import com.groupa.digitalbackendapplication.domain.entities.AuditLog;
@@ -46,9 +45,9 @@ public class AdminController {
     }
 
     @Operation(security = @SecurityRequirement(name = "bearerAuth"))
-    @GetMapping("/fetch-pending-kyc-by-account-number/{account-number}")
-    public ResponseWrapper<KycDto> fetchPendingKycByAccountNumber(@PathVariable("account-number") String payload){
-        return adminService.fetchPendingKycByAccountNumber(payload);
+    @GetMapping("/fetch-pending-kyc-by-account-id/{account-id}")
+    public ResponseWrapper<KycDto> fetchPendingKycById(@PathVariable("account-id") String payload){
+        return adminService.fetchPendingKycByAccountId(UUID.fromString(payload));
     }
 
     @Operation(security = @SecurityRequirement(name = "bearerAuth"))

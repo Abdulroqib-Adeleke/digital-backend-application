@@ -26,7 +26,6 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -214,8 +213,8 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
-    public ResponseWrapper<KycDto> fetchPendingKycByAccountNumber(String payload) {
-        Account account = accountRepository.findByAccountNumber(payload)
+    public ResponseWrapper<KycDto> fetchPendingKycByAccountId(UUID payload) {
+        Account account = accountRepository.findById(payload)
                 .orElseThrow(()-> new ResourceNotFoundException("Account not found"));
 
         KycEntity kyc = kycEntityRepository.findByAccountIdAndStatus(account.getId(), KycStatus.PENDING)
@@ -455,11 +454,9 @@ public class AdminServiceImpl implements AdminService {
         Page<Transaction> allTransaction = transactionRepository.findAll(pageable);
 
         List<TransactionHistoryResponseDto> transactionList = allTransaction.stream()
-                .map(transaction -> {
-                    return new TransactionHistoryResponseDto(transaction.getId(), transaction.getTransactionType(), transaction.getTransactionStatus(),
-                            transaction.getSourceAccount().getAccountNumber(), transaction.getAmountTransferred(),
-                            transaction.getDescription(), transaction.getCreatedAt());
-                })
+                .map(transaction -> new TransactionHistoryResponseDto(transaction.getId(), transaction.getTransactionType(), transaction.getTransactionStatus(),
+                        transaction.getSourceAccount().getAccountNumber(), transaction.getAmountTransferred(),
+                        transaction.getDescription(), transaction.getCreatedAt()))
                 .toList();
 
 
