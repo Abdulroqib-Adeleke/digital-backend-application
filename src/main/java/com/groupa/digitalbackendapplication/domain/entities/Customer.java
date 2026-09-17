@@ -3,10 +3,9 @@ package com.groupa.digitalbackendapplication.domain.entities;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
-import org.hibernate.annotations.UpdateTimestamp;
-import org.jspecify.annotations.Nullable;
 
-import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
 @AllArgsConstructor
@@ -26,4 +25,8 @@ public class Customer extends User{
 
     @Column(name = "bvn", unique = true, length = 100)
     private String bvn;
+
+    @OneToMany(mappedBy = "customer", fetch = FetchType.LAZY,
+            cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<Account> accounts = new HashSet<>();
 }
