@@ -30,4 +30,6 @@ public interface AccountRepository extends JpaRepository<Account, UUID> {
     Page<Account> findAll(Pageable pageable);
 
     Optional<Account> findByCustomerAndPersonalAccountType(Customer customer, PersonalAccountType accountType);
+
+    Optional<Account> findByCustomerIdAndPersonalAccountType(UUID customerId, PersonalAccountType accountType);
 }

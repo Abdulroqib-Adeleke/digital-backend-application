@@ -2,7 +2,7 @@ package com.groupa.digitalbackendapplication.domain.enums;
 
 public enum PersonalAccountType {
     SAVINGS,
-    CHECKING,
+    CHECKINGS,
     RETIREMENTS,
     CDS
 }

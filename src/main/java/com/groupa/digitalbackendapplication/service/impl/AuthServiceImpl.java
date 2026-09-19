@@ -11,6 +11,7 @@ import com.groupa.digitalbackendapplication.domain.dto.request.LoginRequest;
 import com.groupa.digitalbackendapplication.domain.dto.response.LoginResponse;
 import com.groupa.digitalbackendapplication.domain.dto.response.LogoutResponse;
 import com.groupa.digitalbackendapplication.domain.dto.response.Response;
+import com.groupa.digitalbackendapplication.domain.enums.PersonalAccountType;
 import com.groupa.digitalbackendapplication.exceptions.BadRequestException;
 import com.groupa.digitalbackendapplication.exceptions.ResourceNotFoundException;
 import com.groupa.digitalbackendapplication.notification.EmailDetails;
@@ -70,7 +71,7 @@ public class AuthServiceImpl implements AuthService {
 
         AuthUser authUser = (AuthUser) customUserDetailsService.loadUserByUsername(email);
 
-        Account account = accountRepository.findByCustomerId(authUser.getUser().getId())
+        Account account = accountRepository.findByCustomerIdAndPersonalAccountType(authUser.getUser().getId(), PersonalAccountType.SAVINGS)
                 .orElseThrow(()-> new BadRequestException("Something went wrong"));
 
         if (!passwordEncoder.matches(password, authUser.getPassword())) {
