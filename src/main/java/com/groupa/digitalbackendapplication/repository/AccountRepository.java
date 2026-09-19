@@ -20,6 +20,8 @@ public interface AccountRepository extends JpaRepository<Account, UUID> {
 
     Optional<Account> findByCustomerId(UUID customerId);
 
+    Optional<Account> findByCustomerIdAndAccountNumber(UUID customerId, String accountNumber);
+
     long countAccountByAccountTier(AccountTier accountTier);
 
     long countByAccountStatus(AccountStatus accountStatus);

@@ -17,6 +17,9 @@ import java.util.Set;
 @ToString
 public class Customer extends User{
 
+    @Column(name = "transaction_pin")
+    private String transactionCode;
+
     @Column(name = "address", nullable = false, length = 100)
     private String address;
 

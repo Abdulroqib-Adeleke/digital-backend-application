@@ -1,7 +1,9 @@
 package com.groupa.digitalbackendapplication.controller;
 
 import com.groupa.digitalbackendapplication.domain.dto.request.ChangePasswordRequest;
+import com.groupa.digitalbackendapplication.domain.dto.request.ChangeTransactionPinRequest;
 import com.groupa.digitalbackendapplication.domain.dto.request.SecondaryAccountCreationRequest;
+import com.groupa.digitalbackendapplication.domain.dto.request.TransactionPinRequest;
 import com.groupa.digitalbackendapplication.domain.dto.response.AccountCreatedResponse;
 import com.groupa.digitalbackendapplication.domain.dto.response.CustomerDto;
 import com.groupa.digitalbackendapplication.domain.dto.response.ResponseWrapper;
@@ -26,6 +28,24 @@ public class AccountController {
     @GetMapping("/accountName/{account-number}")
     public ResponseWrapper<String> getAccountNameByAccountNumber(@PathVariable("account-number") String accountNumber) {
         return customerService.getUserNameByAccountNumber(accountNumber);
+    }
+
+    @Operation(security = @SecurityRequirement(name = "bearerAuth"))
+    @PutMapping("/set-transaction-pin")
+    public ResponseWrapper<String> setTransactionPin(@RequestBody @Valid ChangeTransactionPinRequest payload) {
+        return customerService.setTransactionPin(payload);
+    }
+
+    @Operation(security = @SecurityRequirement(name = "bearerAuth"))
+    @GetMapping("/verify-transaction pin")
+    public ResponseWrapper<String> verifyTransactionPin(@RequestBody TransactionPinRequest payload) {
+        return customerService.verifyTransactionPin(payload);
+    }
+
+    @Operation(security = @SecurityRequirement(name = "bearerAuth"))
+    @PatchMapping("/change-transaction-pin")
+    public ResponseWrapper<String> changeTransactionPin(@RequestBody @Valid ChangeTransactionPinRequest payload) {
+        return customerService.changeTransactionPin(payload);
     }
 
     @Operation(security = @SecurityRequirement(name = "bearerAuth"))

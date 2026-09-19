@@ -1,8 +1,6 @@
 package com.groupa.digitalbackendapplication.service.impl;
 
-import com.groupa.digitalbackendapplication.domain.dto.request.ChangePasswordRequest;
-import com.groupa.digitalbackendapplication.domain.dto.request.CustomerRegistrationRequest;
-import com.groupa.digitalbackendapplication.domain.dto.request.SecondaryAccountCreationRequest;
+import com.groupa.digitalbackendapplication.domain.dto.request.*;
 import com.groupa.digitalbackendapplication.domain.dto.response.*;
 import com.groupa.digitalbackendapplication.domain.entities.Account;
 import com.groupa.digitalbackendapplication.domain.entities.AuditLog;
@@ -32,6 +30,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -160,6 +159,68 @@ public class CustomerServiceImpl implements CustomerService {
     }
 
     @Override
+    public ResponseWrapper<String> setTransactionPin(ChangeTransactionPinRequest payload) {
+        AuthUser loggedInUser = securityUtil.getSecurityPrincipal();
+        loginSessionUtil.verify(loggedInUser.getUser().getId());
+
+        Customer customer = customerRepository.findById(loggedInUser.getUser().getId())
+                .orElseThrow(()-> new RuntimeException("Error occurred, try again"));
+
+        if(customer.getTransactionCode() != null)
+            throw new BadRequestException("Transaction code already set, " +
+                    "use the forget pin if you have misplaced or forgot your pin");
+
+        if(!payload.pin().equals(payload.confirmPin()))
+            throw new BadRequestException("confirm pin doesn't match");
+
+        String response = setTransactionPin(payload.confirmPin(), customer);
+
+        return ResponseWrapper.<String>builder()
+                .data(response)
+                .message("success")
+                .statusCode(HttpStatus.CREATED)
+                .build();
+    }
+
+    @Override
+    public ResponseWrapper<String> verifyTransactionPin(TransactionPinRequest payload) {
+        AuthUser loggedInUser = securityUtil.getSecurityPrincipal();
+        loginSessionUtil.verify(loggedInUser.getUser().getId());
+
+        Customer customer = customerRepository.findById(loggedInUser.getUser().getId())
+                .orElseThrow(()-> new RuntimeException("Error occurred, try again"));
+
+        if(!passwordEncoder.matches(String.valueOf(payload.pin()), customer.getTransactionCode()))
+            throw new BadCredentialsException("Pin doesn't match");
+
+        return ResponseWrapper.<String>builder()
+                .data("Pin verified")
+                .message("success")
+                .statusCode(HttpStatus.OK)
+                .build();
+    }
+
+    @Override
+    public ResponseWrapper<String> changeTransactionPin(ChangeTransactionPinRequest payload) {
+        AuthUser loggedInUser = securityUtil.getSecurityPrincipal();
+        loginSessionUtil.verify(loggedInUser.getUser().getId());
+
+        Customer customer = customerRepository.findById(loggedInUser.getUser().getId())
+                .orElseThrow(()-> new RuntimeException("Error occurred, try again"));
+
+        if(!payload.pin().equals(payload.confirmPin()))
+            throw new BadRequestException("confirm pin doesn't match");
+
+        String response = setTransactionPin(payload.confirmPin(), customer);
+
+        return ResponseWrapper.<String>builder()
+                .data(response)
+                .message("success")
+                .statusCode(HttpStatus.CREATED)
+                .build();
+    }
+
+    @Override
     public Response<CustomerDto> getUserProfile() {
         AuthUser loggedInUser = securityUtil.getSecurityPrincipal();
         loginSessionUtil.verify(loggedInUser.getUser().getId());
@@ -282,6 +343,7 @@ public class CustomerServiceImpl implements CustomerService {
                 .role(role)
                 .gender(gender)
                 .dateOfBirth(dateOfBirth)
+                .transactionCode(null)
                 .address(address)
                 .bvn(null)
                 .nin(null)
@@ -369,5 +431,18 @@ public class CustomerServiceImpl implements CustomerService {
                 .messageBody(welcomeMessage)
                 .build();
         emailService.sendEmail(emailDetails);
+    }
+
+    private String setTransactionPin(Integer pin, Customer customer){
+
+        boolean isFourDigits = pin >= 1000 && pin <= 9999;
+
+        if(!isFourDigits)
+            throw new BadRequestException("Invalid pin: pin must be four digits");
+
+        customer.setTransactionCode(passwordEncoder.encode(String.valueOf(pin)));
+        customerRepository.save(customer);
+
+        return "Transaction code set successful";
     }
 }
