@@ -1,0 +1,22 @@
+*   [33m1b887c6[m[33m ([m[1;31morigin/master[m[33m, [m[1;31morigin/HEAD[m[33m)[m Merge pull request #1 from Abdulroqib-Adeleke/additional-features
+[31m|[m[32m\[m  
+[31m|[m *   [33m98fe86b[m Merge branch 'additional-features' of https://github.com/Abdulroqib-Adeleke/digital-backend-application into additional-features
+[31m|[m [33m|[m[34m\[m  
+[31m|[m [33m|[m * [33m3be6ddf[m Updated Docker compose
+[31m|[m [33m|[m[31m/[m  
+[31m|[m[31m/[m[33m|[m   
+[31m|[m * [33mc61a363[m Implemented multiple account creation
+[31m|[m[31m/[m  
+*   [33mebb6430[m Merge pull request #34 from mastertbal/task/admin-impl
+[35m|[m[36m\[m  
+[35m|[m * [33m168023e[m[33m ([m[1;31mupstream/task/admin-impl[m[33m, [m[1;31morigin/task/admin-impl[m[33m)[m Changed otp verification to request account number
+* [36m|[m [33m55dcb68[m Merge pull request #33 from mastertbal/task/admin-impl
+[1;31m|[m[36m\[m[36m|[m 
+[1;31m|[m * [33mafe253b[m Code cleanup
+[1;31m|[m[1;31m/[m  
+*   [33md7ab360[m Merge pull request #32 from mastertbal/feature/OTP-Implementation
+[1;33m|[m[1;34m\[m  
+[1;33m|[m *   [33m68f3874[m[33m ([m[1;31mupstream/feature/OTP-Implementation[m[33m, [m[1;31morigin/feature/OTP-Implementation[m[33m)[m Merge branch 'master' into feature/OTP-Implementation
+[1;33m|[m [1;35m|[m[1;33m\[m  
+[1;33m|[m [1;35m|[m[1;33m/[m  
+[1;33m|[m[1;33m/[m[1;35m|[m   

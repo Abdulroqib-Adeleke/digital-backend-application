@@ -161,7 +161,7 @@ public class OtpServiceImpl implements OtpService {
     }
     private void sendWelcomeEmail(String firstname, String email, String accountNumber, AccountTier accountTier) {
         String welcomeMessage = "Welcome, " + firstname + "!\n\n" +
-                "We are excited to have you on board at PAYEDGE DIGITAL BANKING. \n\n" +
+                "We are excited to have you on board at POI-BANK DIGITAL BANKING. \n\n" +
                 "Your account has been successfully verified and activated!\n\n" +
                 "Below are your account details:\n\n" +
                 "Account Number: " + accountNumber + "\n" +
@@ -171,7 +171,7 @@ public class OtpServiceImpl implements OtpService {
                 "Your financial journey starts here!";
         EmailDetails emailDetails = EmailDetails.builder()
                 .recipient(email)
-                .subject("Welcome to PayEdge Digital Banking")
+                .subject("Welcome to POI-BANK Digital Banking")
                 .messageBody(welcomeMessage)
                 .build();
         emailService.sendEmail(emailDetails);

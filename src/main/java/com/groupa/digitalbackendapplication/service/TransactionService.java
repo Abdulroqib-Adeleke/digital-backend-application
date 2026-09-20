@@ -2,6 +2,7 @@ package com.groupa.digitalbackendapplication.service;
 
 import com.groupa.digitalbackendapplication.domain.dto.request.CardDetailsRequest;
 import com.groupa.digitalbackendapplication.domain.dto.request.TransferFundsRequest;
+import com.groupa.digitalbackendapplication.domain.dto.request.TransferWithinAccount;
 import com.groupa.digitalbackendapplication.domain.dto.response.ResponseWrapper;
 import com.groupa.digitalbackendapplication.domain.dto.response.TransactionHistoryResponseDto;
 import com.groupa.digitalbackendapplication.domain.dto.response.TransactionStatusResponse;
@@ -12,6 +13,8 @@ import java.util.UUID;
 
 public interface TransactionService {
     ResponseWrapper<TransactionStatusResponse> transferFunds(@Valid TransferFundsRequest payload);
+
+    ResponseWrapper<TransactionStatusResponse> transferWithinUserAccount(@Valid TransferWithinAccount payload);
 
     ResponseWrapper<TransactionStatusResponse> depositFunds(@Valid CardDetailsRequest payload);
 

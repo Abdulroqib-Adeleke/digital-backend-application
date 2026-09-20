@@ -23,7 +23,7 @@ public class OtpDeliveryServiceImpl implements OtpDeliveryService {
         String message = """
                 Hello, %s
                 
-                Your PAYEDGE Digital Banking verification code is:
+                Your POI-BANK Digital Banking verification code is:
                 
                 %s
                 
@@ -31,15 +31,15 @@ public class OtpDeliveryServiceImpl implements OtpDeliveryService {
                 
                 Please do not share this code with anyone.
                 
-                If you did not initiate this request, please contact PAYEDGE Digital support.
+                If you did not initiate this request, please contact POI-BANK Digital support.
                 
                 Regards,
-                PAYEDGE Digital Banking
+                POI-BANK Digital Banking
                 """.formatted(firstname, otp);
 
         EmailDetails emailDetails = EmailDetails.builder()
                 .recipient(email)
-                .subject("PAYEDGE Digital Banking - OTP Verification")
+                .subject("POI-BANK Digital Banking - OTP Verification")
                 .messageBody(message)
                 .build();
         emailService.sendEmail(emailDetails);
