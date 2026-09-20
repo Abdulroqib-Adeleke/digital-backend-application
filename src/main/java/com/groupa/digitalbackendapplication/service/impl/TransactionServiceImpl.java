@@ -2,6 +2,7 @@ package com.groupa.digitalbackendapplication.service.impl;
 
 import com.groupa.digitalbackendapplication.domain.dto.request.CardDetailsRequest;
 import com.groupa.digitalbackendapplication.domain.dto.request.TransferFundsRequest;
+import com.groupa.digitalbackendapplication.domain.dto.request.TransferWithinAccount;
 import com.groupa.digitalbackendapplication.domain.dto.response.ResponseWrapper;
 import com.groupa.digitalbackendapplication.domain.dto.response.TransactionHistoryResponseDto;
 import com.groupa.digitalbackendapplication.domain.dto.response.TransactionStatusResponse;
@@ -148,6 +149,12 @@ public class TransactionServiceImpl implements TransactionService {
                 .message("Transaction successful")
                 .statusCode(HttpStatus.CREATED)
                 .build();
+    }
+
+    @Override
+    public ResponseWrapper<TransactionStatusResponse> transferWithinUserAccount(TransferWithinAccount payload){
+        return null;
+
     }
 
     @Override
