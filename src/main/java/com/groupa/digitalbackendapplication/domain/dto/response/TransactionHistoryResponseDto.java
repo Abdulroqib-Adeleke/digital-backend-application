@@ -12,6 +12,9 @@ public record TransactionHistoryResponseDto(
         TransactionType transactionType,
         TransactionStatus transactionStatus,
         String sourceAccount,
+        String sourceAccountName,
+        String destinationAccount,
+        String destinationAccountName,
         BigDecimal amount,
         String description,
         LocalDateTime createdAt

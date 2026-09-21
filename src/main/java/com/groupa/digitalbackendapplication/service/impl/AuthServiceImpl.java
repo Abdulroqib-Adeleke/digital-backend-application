@@ -103,16 +103,16 @@ public class AuthServiceImpl implements AuthService {
 
         EmailDetails emailDetails = EmailDetails.builder()
                 .recipient(customer.getEmail())
-                .subject("New Login to your PAYEDGE Digital Bank Account")
+                .subject("New Login to your POI-BANK Digital Bank Account")
                 .messageBody(
                         "Dear " + customer.getFirstName() + ",\n\n" +
-                        "A successful login to your PAYEDGE Digital Banking account " +
+                        "A successful login to your POI-BANK Digital Banking account " +
                         "was detected.\n\n" +
                         "If this was you, no action is required.\n\n" +
                         "If you did not perform this login, please contact " +
                         "our support team immediately.\n\n " +
                         "Regards,\n" +
-                        "PAYEDGE TEAM"
+                        "POI-BANK TEAM"
                 )
                 .build();
         emailService.sendEmail(emailDetails);
@@ -173,6 +173,22 @@ public class AuthServiceImpl implements AuthService {
                 .accessToken(token)
                 .refreshToken(refreshToken)
                 .build();
+
+        EmailDetails emailDetails = EmailDetails.builder()
+                .recipient(admin.getEmail())
+                .subject("New Login to your POI-BANK Digital Bank Account")
+                .messageBody(
+                        "Dear " + admin.getFirstName() + ",\n\n" +
+                                "A successful login to your POI-BANK Digital Banking account " +
+                                "was detected.\n\n" +
+                                "If this was you, no action is required.\n\n" +
+                                "If you did not perform this login, please contact " +
+                                "our support team immediately.\n\n " +
+                                "Regards,\n" +
+                                "POI-BANK TEAM"
+                )
+                .build();
+        emailService.sendEmail(emailDetails);
 
         // save audit log
         auditLogRepository.save(

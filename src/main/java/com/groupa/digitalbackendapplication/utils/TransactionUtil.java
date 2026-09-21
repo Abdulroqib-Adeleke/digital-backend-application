@@ -10,13 +10,16 @@ import java.math.BigDecimal;
 public class TransactionUtil {
 
     public static Transaction buildTransactionEntity(TransactionType transactionType, TransactionStatus transactionStatus,
-                                               Account sourceAccount, Account destinationAccount, BigDecimal amount,
+                                               Account sourceAccount, String sourceAccountName, Account destinationAccount, String destinationAccountNumber, String destinationAccountName, BigDecimal amount,
                                                String description){
         return Transaction.builder()
                 .transactionType(transactionType)
                 .transactionStatus(transactionStatus)
                 .sourceAccount(sourceAccount)
+                .accountName(sourceAccountName)
                 .destinationAccount(destinationAccount)
+                .destinationAccountNumber(destinationAccountNumber)
+                .destinationAccountName(destinationAccountName)
                 .amountTransferred(amount)
                 .description(description)
                 .build();

@@ -19,10 +19,7 @@ import com.groupa.digitalbackendapplication.repository.*;
 import com.groupa.digitalbackendapplication.security.AuthUser;
 import com.groupa.digitalbackendapplication.service.DepositService;
 import com.groupa.digitalbackendapplication.service.TransactionService;
-import com.groupa.digitalbackendapplication.utils.SecurityUtil;
-import com.groupa.digitalbackendapplication.utils.TierLimiterUtil;
-import com.groupa.digitalbackendapplication.utils.TransactionRequeryUtil;
-import com.groupa.digitalbackendapplication.utils.TransactionUtil;
+import com.groupa.digitalbackendapplication.utils.*;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -56,11 +53,13 @@ public class TransactionServiceImpl implements TransactionService {
     private final AuditLogRepository auditLogRepository;
     private final CustomerRepository customerRepository;
     private final PasswordEncoder passwordEncoder;
+    private final AccountDailyAuditUtil accountDailyAuditUtil;
 
     @Override
     @Transactional
     public ResponseWrapper<TransactionStatusResponse> transferFunds(@Valid TransferFundsRequest payload) {
         Customer customer = getAuthenticatedUser();
+        String customerName = customer.getFirstName() + " " + customer.getLastName();
 
         Account sourceAccount = getAuthenticatedUserAccount(customer, payload.sourceAccount());
 
@@ -70,6 +69,11 @@ public class TransactionServiceImpl implements TransactionService {
         //Does destination Account exists
         Account destinationAccount = accountRepository.findByAccountNumber(payload.destinationAccount().trim())
                 .orElseThrow(() -> new ResourceNotFoundException("Account number does not exist"));
+
+        Customer destinationAccountCustomer = destinationAccount.getCustomer();
+
+        String destinationAccountName = destinationAccountCustomer.getFirstName() + " " + destinationAccountCustomer.getLastName();
+
 
         if(!isAccountActive(destinationAccount.getAccountNumber()))
             throw new BadRequestException("Can not transfer to this account");
@@ -85,11 +89,11 @@ public class TransactionServiceImpl implements TransactionService {
         if(!passwordEncoder.matches(String.valueOf(payload.transactionPin()), customer.getTransactionCode()))
             throw new BadCredentialsException("Wrong transaction pin");
 
-        Transaction senderTransaction = TransactionUtil.buildTransactionEntity(TransactionType.TRANSFER, TransactionStatus.SUCCESSFUL, sourceAccount,
-                destinationAccount, payload.amount(), payload.description().trim());
+        Transaction senderTransaction = TransactionUtil.buildTransactionEntity(TransactionType.WITHDRAWAL, TransactionStatus.SUCCESSFUL, sourceAccount,
+                customerName, destinationAccount, destinationAccount.getAccountNumber(), destinationAccountName, payload.amount(), payload.description().trim());
 
         Transaction receiverTransaction = TransactionUtil.buildTransactionEntity(TransactionType.TRANSFER, TransactionStatus.SUCCESSFUL, destinationAccount,
-                sourceAccount, payload.amount(), payload.description().trim());
+                destinationAccountName, sourceAccount, sourceAccount.getAccountNumber(), customerName, payload.amount(), payload.description().trim());
 
         //Deduct from sender, credit receiver
         sourceAccount.setBalance(sourceAccount.getBalance().subtract(payload.amount()));
@@ -132,6 +136,8 @@ public class TransactionServiceImpl implements TransactionService {
         dailyTransactions.setTotalDebit(dailyTransactions.getTotalDebit().add(payload.amount()));
 
         dailyTransactionsRepository.save(dailyTransactions);
+        accountDailyAuditUtil.recordDailyAccountAudit(sourceAccount, TransactionType.WITHDRAWAL, payload.amount());
+        accountDailyAuditUtil.recordDailyAccountAudit(destinationAccount, TransactionType.TRANSFER, payload.amount());
 
         // save audit log
         User user = securityUtil.getSecurityPrincipal().getUser();
@@ -190,6 +196,8 @@ public class TransactionServiceImpl implements TransactionService {
             DailyTransactions dailyTransactions = fetchDailyTransactionEntity();
             dailyTransactions.setTotalCredit(dailyTransactions.getTotalCredit().add(payload.depositAmount()));
             dailyTransactionsRepository.save(dailyTransactions);
+
+            accountDailyAuditUtil.recordDailyAccountAudit(destinationAccount, TransactionType.DEPOSIT, payload.depositAmount());
 
             // save audit log
             User user = securityUtil.getSecurityPrincipal().getUser();
@@ -304,6 +312,7 @@ public class TransactionServiceImpl implements TransactionService {
         List<TransactionHistoryResponseDto> transactions = transactionRepository.findAllByDestinationAccount(account)
                 .stream().map(tran -> new TransactionHistoryResponseDto(tran.getId(),
                         tran.getTransactionType(), tran.getTransactionStatus(), tran.getSourceAccount() != null ? tran.getSourceAccount().getAccountNumber() : null,
+                        tran.getAccountName(), tran.getDestinationAccountNumber(), tran.getDestinationAccountName(),
                         tran.getAmountTransferred(), tran.getDescription(), tran.getCreatedAt()))
                 .toList();
 
@@ -339,7 +348,8 @@ public class TransactionServiceImpl implements TransactionService {
             sourceAccount = null;
 
         TransactionHistoryResponseDto dto =  new TransactionHistoryResponseDto(transaction.getId(),
-                transaction.getTransactionType(), transaction.getTransactionStatus(),sourceAccount,
+                transaction.getTransactionType(), transaction.getTransactionStatus(),sourceAccount, transaction.getAccountName(),
+                transaction.getDestinationAccountNumber(), transaction.getDestinationAccountName(),
                 transaction.getAmountTransferred(), transaction.getDescription(), transaction.getCreatedAt());
 
         // save audit log
