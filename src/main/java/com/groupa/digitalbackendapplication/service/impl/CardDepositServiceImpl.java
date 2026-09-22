@@ -2,6 +2,7 @@ package com.groupa.digitalbackendapplication.service.impl;
 
 import com.groupa.digitalbackendapplication.domain.dto.request.CardDetailsRequest;
 import com.groupa.digitalbackendapplication.domain.entities.Account;
+import com.groupa.digitalbackendapplication.domain.entities.Customer;
 import com.groupa.digitalbackendapplication.domain.entities.LedgerEntry;
 import com.groupa.digitalbackendapplication.domain.entities.Transaction;
 import com.groupa.digitalbackendapplication.domain.enums.EntryType;
@@ -32,11 +33,16 @@ public class CardDepositServiceImpl implements DepositService {
     public Transaction buildSuccessfulDeposit(Account account, @Valid CardDetailsRequest payload) {
         BigDecimal depositAmount = payload.depositAmount();
 
-        Transaction transaction = TransactionUtil.buildTransactionEntity(TransactionType.DEPOSIT, TransactionStatus.SUCCESSFUL,
-                null, account, depositAmount, payload.description());
+        Customer customer = account.getCustomer();
+
+        String name = customer.getFirstName() + " " + customer.getLastName();
 
         //Fund account
         account.setBalance(account.getBalance().add(depositAmount));
+
+        Transaction transaction = TransactionUtil.buildTransactionEntity(TransactionType.DEPOSIT, TransactionStatus.SUCCESSFUL,
+                null,null, account, account.getAccountNumber(), name, depositAmount, payload.description(), account.getBalance());
+
 
         LocalDateTime now = LocalDateTime.now();
 
@@ -63,10 +69,13 @@ public class CardDepositServiceImpl implements DepositService {
     @Override
     @Transactional
     public Transaction buildPendingDeposit(Account account, CardDetailsRequest payload) {
+        Customer customer = account.getCustomer();
+        String name = customer.getFirstName() + " " + customer.getLastName();
+
         BigDecimal depositAmount = payload.depositAmount();
 
         Transaction transaction = TransactionUtil.buildTransactionEntity(TransactionType.DEPOSIT, TransactionStatus.PENDING,
-                null, account, depositAmount, payload.description().trim());
+                null, null, account, account.getAccountNumber(), name, depositAmount, payload.description().trim(), account.getBalance());
 
         LedgerEntry debitEntry = new LedgerEntry();
         debitEntry.setAccount(null);

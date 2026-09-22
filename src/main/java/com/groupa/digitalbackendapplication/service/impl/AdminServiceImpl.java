@@ -161,6 +161,9 @@ public class AdminServiceImpl implements AdminService {
                         t.getTransactionType(),
                         t.getTransactionStatus(),
                         t.getSourceAccount() != null ? t.getSourceAccount().getAccountNumber() : null,
+                        t.getAccountName(),
+                        t.getDestinationAccountNumber(),
+                        t.getDestinationAccountName(),
                         t.getAmountTransferred(),
                         t.getDescription(),
                         t.getCreatedAt()))
@@ -454,7 +457,7 @@ public class AdminServiceImpl implements AdminService {
         List<TransactionHistoryResponseDto> transactionList = allTransaction.stream()
                 .map(transaction -> {
                     return new TransactionHistoryResponseDto(transaction.getId(), transaction.getTransactionType(), transaction.getTransactionStatus(),
-                            transaction.getSourceAccount().getAccountNumber(), transaction.getAmountTransferred(),
+                            transaction.getSourceAccount().getAccountNumber(), transaction.getAccountName(), transaction.getDestinationAccountNumber(), transaction.getDestinationAccountName(), transaction.getAmountTransferred(),
                             transaction.getDescription(), transaction.getCreatedAt());
                 })
                 .toList();

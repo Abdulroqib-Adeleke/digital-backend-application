@@ -23,4 +23,6 @@ public interface TransactionService {
     ResponseWrapper<List<TransactionHistoryResponseDto>> getAllTransactionHistory(String accountNumber);
 
     ResponseWrapper<TransactionHistoryResponseDto> getTransactionById(UUID transactionId);
+
+
 }

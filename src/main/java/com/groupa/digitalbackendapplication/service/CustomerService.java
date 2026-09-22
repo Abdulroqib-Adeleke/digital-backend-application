@@ -5,7 +5,10 @@ import com.groupa.digitalbackendapplication.domain.dto.response.AccountCreatedRe
 import com.groupa.digitalbackendapplication.domain.dto.response.CustomerDto;
 import com.groupa.digitalbackendapplication.domain.dto.response.ResponseWrapper;
 import com.groupa.digitalbackendapplication.domain.dto.response.Response;
+import org.springframework.http.ResponseEntity;
 
+import java.time.LocalDate;
+import java.util.Date;
 import java.util.UUID;
 
 public interface CustomerService {
@@ -27,4 +30,10 @@ public interface CustomerService {
     Response<CustomerDto> getUserProfileById(UUID userId);
 
     ResponseWrapper<String> changePassword(ChangePasswordRequest payload);
+
+    ResponseEntity<byte[]> generateReceipt(UUID transactionId);
+
+    ResponseWrapper<String> generateStatementViaEmail(GenerateStatementRequest payload);
+
+    ResponseEntity<byte[]> generateStatement(GenerateStatementRequest payload);
 }

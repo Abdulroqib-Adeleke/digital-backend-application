@@ -2,14 +2,11 @@ package com.groupa.digitalbackendapplication.service.impl;
 
 import com.groupa.digitalbackendapplication.domain.dto.request.*;
 import com.groupa.digitalbackendapplication.domain.dto.response.*;
-import com.groupa.digitalbackendapplication.domain.entities.Account;
-import com.groupa.digitalbackendapplication.domain.entities.AuditLog;
-import com.groupa.digitalbackendapplication.domain.entities.Customer;
+import com.groupa.digitalbackendapplication.domain.entities.*;
 import com.groupa.digitalbackendapplication.domain.enums.AccountStatus;
 import com.groupa.digitalbackendapplication.domain.enums.AccountTier;
 import com.groupa.digitalbackendapplication.domain.enums.Gender;
 import com.groupa.digitalbackendapplication.domain.enums.Role;
-import com.groupa.digitalbackendapplication.domain.entities.User;
 import com.groupa.digitalbackendapplication.domain.enums.*;
 import com.groupa.digitalbackendapplication.domain.dto.response.LogoutResponse;
 import com.groupa.digitalbackendapplication.domain.dto.response.Response;
@@ -17,9 +14,9 @@ import com.groupa.digitalbackendapplication.exceptions.BadRequestException;
 import com.groupa.digitalbackendapplication.exceptions.ResourceNotFoundException;
 import com.groupa.digitalbackendapplication.notification.EmailDetails;
 import com.groupa.digitalbackendapplication.notification.EmailService;
-import com.groupa.digitalbackendapplication.repository.AccountRepository;
-import com.groupa.digitalbackendapplication.repository.AuditLogRepository;
-import com.groupa.digitalbackendapplication.repository.CustomerRepository;
+import com.groupa.digitalbackendapplication.pdf.ReceiptPdfService;
+import com.groupa.digitalbackendapplication.pdf.StatementPdfService;
+import com.groupa.digitalbackendapplication.repository.*;
 import com.groupa.digitalbackendapplication.security.AuthUser;
 import com.groupa.digitalbackendapplication.service.*;
 import com.groupa.digitalbackendapplication.utils.AccountUtil;
@@ -28,8 +25,7 @@ import com.groupa.digitalbackendapplication.utils.EncryptionUtil;
 import com.groupa.digitalbackendapplication.utils.SecurityUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.HttpStatusCode;
+import org.springframework.http.*;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -39,10 +35,8 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
+import java.time.LocalTime;
+import java.util.*;
 
 @Slf4j
 @Service
@@ -62,6 +56,11 @@ public class CustomerServiceImpl implements CustomerService {
     private final LoginSessionService loginSessionService;
     private final RefreshSessionService refreshSessionService;
     private final EmailService emailService;
+    private final ReceiptPdfService receiptPdfService;
+    private final StatementPdfService  statementPdfService;
+    private final TransactionService transactionService;
+    private final TransactionRepository transactionRepository;
+    private final AccountDailyAuditRepository accountDailyAuditRepository;
 
     @Override
     public ResponseWrapper<AccountCreatedResponse> createPersonalAccount(CustomerRegistrationRequest payload) {
@@ -332,6 +331,83 @@ public class CustomerServiceImpl implements CustomerService {
                 .build();
     }
 
+    @Override
+    public ResponseEntity<byte[]> generateReceipt(UUID transactionId) {
+        AuthUser loggedInUser = securityUtil.getSecurityPrincipal();
+        loginSessionUtil.verify(loggedInUser.getUser().getId());
+
+        byte[] receipt = generateTransactionReceipt(loggedInUser.getUser().getId(), transactionId);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentDisposition(
+                ContentDisposition.attachment()
+                        .filename("receipt-" + loggedInUser.getUser().getFirstName() + ".pdf")
+                        .build());
+        headers.setContentLength(receipt.length);
+
+
+        return new ResponseEntity<>(receipt, headers, HttpStatus.CREATED);
+
+    }
+
+    @Override
+    public ResponseWrapper<String> generateStatementViaEmail(GenerateStatementRequest payload) {
+
+        AuthUser loggedInUser = securityUtil.getSecurityPrincipal();
+        loginSessionUtil.verify(loggedInUser.getUser().getId());
+
+        Customer customer = customerRepository.findById(loggedInUser.getUser().getId())
+                .orElseThrow(()-> new RuntimeException("Error occurred, try again"));
+
+        byte[] statementPDF = generateStatementPDF(customer, payload);
+
+        EmailDetails emailDetails = EmailDetails.builder()
+                .subject("Bank Statement")
+                .recipient(customer.getEmail())
+                .messageBody("Find an attachment of your bank statement")
+                .build();
+
+        emailService.sendEmail(emailDetails, statementPDF);
+
+        auditLogRepository.save(
+                AuditLog.builder()
+                        .actionType(ActionType.STATEMENT_GENERATED)
+                        .userId(customer.getId())
+                        .userEmail(customer.getEmail())
+                        .timeOfCreation(LocalDateTime.now())
+                        .entityType("customer")
+                        .build());
+
+        return ResponseWrapper.<String>builder()
+                .data("Your statement has been sent to your email")
+                .message("Success")
+                .statusCode(HttpStatus.OK)
+                .build();
+
+    }
+
+    @Override
+    public ResponseEntity<byte[]> generateStatement(GenerateStatementRequest payload) {
+        AuthUser loggedInUser = securityUtil.getSecurityPrincipal();
+        loginSessionUtil.verify(loggedInUser.getUser().getId());
+
+        Customer customer = customerRepository.findById(loggedInUser.getUser().getId())
+                .orElseThrow(()-> new RuntimeException("Error occurred, try again"));
+
+        byte[] statementPDF = generateStatementPDF(customer, payload);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentDisposition(
+                ContentDisposition.attachment()
+                        .filename("Bank-statement" + customer.getFirstName() + ".pdf")
+                        .build());
+        headers.setContentLength(statementPDF.length);
+
+        return new ResponseEntity<>(statementPDF, headers, HttpStatus.CREATED);
+    }
+
     private SavedCustomerResponse buildCustomerDetails(String firstName, String lastName, String email, String password, String phoneNumber, Role role, Gender gender, LocalDate dateOfBirth, String address){
 
         Customer customer =Customer.builder()
@@ -444,5 +520,118 @@ public class CustomerServiceImpl implements CustomerService {
         customerRepository.save(customer);
 
         return "Transaction code set successful";
+    }
+
+    private List<StatementLine>  buildStatementLines(List<Transaction> transactions){
+
+        List<Transaction> sorted = transactions.stream()
+                .sorted(Comparator.comparing(Transaction::getCreatedAt))
+                .toList();
+
+        List<StatementLine> statementLines = new ArrayList<>();
+
+        for (Transaction t : sorted) {
+
+            String details = "";
+            String type = "";
+            if(t.getTransactionType() == TransactionType.WITHDRAWAL){
+                details = "To " + t.getDestinationAccountName();
+                type = EntryType.DEBIT.name();
+            }
+            else if(t.getTransactionType() == TransactionType.DEPOSIT){
+                details = "Card deposit";
+                type = EntryType.CREDIT.name();
+            }
+            else if(t.getTransactionType() == TransactionType.TRANSFER){
+                details = "From "  + t.getDestinationAccountName();
+                type = EntryType.CREDIT.name();
+            }
+            boolean credit = type.equalsIgnoreCase("CREDIT");
+
+            statementLines.add(new StatementLine(
+                    t.getCreatedAt(),
+                    t.getTransactionType().name(),
+                    details,
+                    type,
+                    credit,
+                    t.getAmountTransferred(),
+                    t.getBalanceAfterTransfer()));
+        }
+
+        return statementLines;
+    }
+
+    private List<Transaction> buildTransactions(Account account, LocalDateTime startDate, LocalDateTime endDate){
+        List<Transaction> transactions = new ArrayList<>();
+        
+        List<Transaction> transactionList = transactionRepository.findTransactionsByAccountAndTransactionStatusAndDateRange(
+                account, TransactionStatus.SUCCESSFUL, startDate, endDate);
+        
+        for (Transaction t : transactionList) {
+            if(t.getTransactionType() == TransactionType.WITHDRAWAL && t.getSourceAccount().equals(account))
+                transactions.add(t);
+            else if (t.getTransactionType() == TransactionType.DEPOSIT && t.getDestinationAccount().equals(account))
+                transactions.add(t);
+            else if (t.getTransactionType() == TransactionType.TRANSFER && t.getSourceAccount().equals(account))
+                transactions.add(t);
+        }
+
+        return transactions;
+    }
+
+    private byte[] generateTransactionReceipt(UUID userId, UUID transactionId){
+
+        Customer customer = customerRepository.findById(userId)
+                .orElseThrow(()-> new RuntimeException("Error occurred, try again"));
+
+        Set<Account> accounts = customer.getAccounts();
+
+        Transaction transaction = transactionRepository.findById(transactionId)
+                .orElseThrow(()-> new RuntimeException("Error occurred, try again"));
+
+        TransactionHistoryResponseDto dto = transactionService.getTransactionById(transactionId).getData();
+        byte[] receiptPDF = receiptPdfService.generatePDF(dto);
+
+        return receiptPDF;
+    }
+
+    private byte[] generateStatementPDF(Customer customer, GenerateStatementRequest payload){
+
+        String accountName = customer.getFirstName() + " " + customer.getLastName();
+
+        Set<Account> accounts = customer.getAccounts();
+
+
+        Optional<Account> account = accounts.stream()
+                .filter(account1 -> account1.getAccountNumber().equals(payload.accountNumber()))
+                .findFirst();
+
+        if(account.isEmpty()) throw new BadRequestException("Access denied");
+
+        Account userAccount = account.get();
+
+        Optional<AccountDailyAudit> openingOptional = accountDailyAuditRepository
+                .findFirstByAccountIdAndDateGreaterThanEqualOrderByDateAsc(userAccount.getId(), payload.from());
+        Optional<AccountDailyAudit> closingOptional = accountDailyAuditRepository
+                .findFirstByAccountIdAndDateLessThanEqualOrderByDateDesc(userAccount.getId(), payload.to());
+
+        if(openingOptional.isEmpty() && closingOptional.isEmpty())
+            throw new BadRequestException("Could not find transactions for statement generation");
+
+        AccountDailyAudit opening =  openingOptional.get();
+        AccountDailyAudit closing =  closingOptional.get();
+
+        LocalDateTime start = payload.from().atStartOfDay();
+
+        LocalDateTime endOfDay = payload.to().atTime(LocalTime.MAX);
+
+        List<Transaction> transactions =  buildTransactions(userAccount, start, endOfDay);
+
+        List<StatementLine> statementLines = buildStatementLines(transactions);
+
+        StatementData data = new StatementData(accountName, payload.accountNumber(), userAccount.getPersonalAccountType().name(),
+                payload.from(), payload.to(), opening.getOpeningAmount(), closing.getClosingAmount(), statementLines);
+
+        return statementPdfService.generate(data);
     }
 }

@@ -19,10 +19,7 @@ import com.groupa.digitalbackendapplication.repository.*;
 import com.groupa.digitalbackendapplication.security.AuthUser;
 import com.groupa.digitalbackendapplication.service.DepositService;
 import com.groupa.digitalbackendapplication.service.TransactionService;
-import com.groupa.digitalbackendapplication.utils.SecurityUtil;
-import com.groupa.digitalbackendapplication.utils.TierLimiterUtil;
-import com.groupa.digitalbackendapplication.utils.TransactionRequeryUtil;
-import com.groupa.digitalbackendapplication.utils.TransactionUtil;
+import com.groupa.digitalbackendapplication.utils.*;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -56,11 +53,13 @@ public class TransactionServiceImpl implements TransactionService {
     private final AuditLogRepository auditLogRepository;
     private final CustomerRepository customerRepository;
     private final PasswordEncoder passwordEncoder;
+    private final AccountDailyAuditUtil accountDailyAuditUtil;
 
     @Override
     @Transactional
     public ResponseWrapper<TransactionStatusResponse> transferFunds(@Valid TransferFundsRequest payload) {
         Customer customer = getAuthenticatedUser();
+        String customerName = customer.getFirstName() + " " + customer.getLastName();
 
         Account sourceAccount = getAuthenticatedUserAccount(customer, payload.sourceAccount());
 
@@ -71,8 +70,16 @@ public class TransactionServiceImpl implements TransactionService {
         Account destinationAccount = accountRepository.findByAccountNumber(payload.destinationAccount().trim())
                 .orElseThrow(() -> new ResourceNotFoundException("Account number does not exist"));
 
+        Customer destinationAccountCustomer = destinationAccount.getCustomer();
+
+        String destinationAccountName = destinationAccountCustomer.getFirstName() + " " + destinationAccountCustomer.getLastName();
+
+
         if(!isAccountActive(destinationAccount.getAccountNumber()))
             throw new BadRequestException("Can not transfer to this account");
+
+        accountDailyAuditUtil.initializeDailyAuditIfNotExist(sourceAccount);
+        accountDailyAuditUtil.initializeDailyAuditIfNotExist(destinationAccount);
 
         //Check if account balance isn't above tier maximum balance
         tierLimiterUtil.validateNotAlreadyOverTierMaxBalance(sourceAccount);
@@ -85,15 +92,16 @@ public class TransactionServiceImpl implements TransactionService {
         if(!passwordEncoder.matches(String.valueOf(payload.transactionPin()), customer.getTransactionCode()))
             throw new BadCredentialsException("Wrong transaction pin");
 
-        Transaction senderTransaction = TransactionUtil.buildTransactionEntity(TransactionType.TRANSFER, TransactionStatus.SUCCESSFUL, sourceAccount,
-                destinationAccount, payload.amount(), payload.description().trim());
-
-        Transaction receiverTransaction = TransactionUtil.buildTransactionEntity(TransactionType.TRANSFER, TransactionStatus.SUCCESSFUL, destinationAccount,
-                sourceAccount, payload.amount(), payload.description().trim());
-
         //Deduct from sender, credit receiver
         sourceAccount.setBalance(sourceAccount.getBalance().subtract(payload.amount()));
         destinationAccount.setBalance(destinationAccount.getBalance().add(payload.amount()));
+
+        Transaction senderTransaction = TransactionUtil.buildTransactionEntity(TransactionType.WITHDRAWAL, TransactionStatus.SUCCESSFUL, sourceAccount,
+                customerName, destinationAccount, destinationAccount.getAccountNumber(), destinationAccountName, payload.amount(), payload.description().trim(), sourceAccount.getBalance());
+
+        Transaction receiverTransaction = TransactionUtil.buildTransactionEntity(TransactionType.TRANSFER, TransactionStatus.SUCCESSFUL, destinationAccount,
+                destinationAccountName, sourceAccount, sourceAccount.getAccountNumber(), customerName, payload.amount(), payload.description().trim(), destinationAccount.getBalance());
+
 
         //Set total daily transfer
         tierLimiterUtil.recordDailyTransferTotal(sourceAccount.getAccountNumber(), payload.amount());
@@ -132,6 +140,8 @@ public class TransactionServiceImpl implements TransactionService {
         dailyTransactions.setTotalDebit(dailyTransactions.getTotalDebit().add(payload.amount()));
 
         dailyTransactionsRepository.save(dailyTransactions);
+        accountDailyAuditUtil.recordDailyAccountAudit(sourceAccount, TransactionType.WITHDRAWAL, payload.amount());
+        accountDailyAuditUtil.recordDailyAccountAudit(destinationAccount, TransactionType.TRANSFER, payload.amount());
 
         // save audit log
         User user = securityUtil.getSecurityPrincipal().getUser();
@@ -152,9 +162,95 @@ public class TransactionServiceImpl implements TransactionService {
     }
 
     @Override
+    @Transactional
     public ResponseWrapper<TransactionStatusResponse> transferWithinUserAccount(TransferWithinAccount payload){
-        return null;
+        Customer customer = getAuthenticatedUser();
 
+        Account sourceAccount = getAuthenticatedUserAccount(customer, payload.sourceAccount());
+
+        Account destinationAccount = getAuthenticatedUserAccount(customer, payload.destinationAccount());
+
+        if(!isAccountActive(sourceAccount.getAccountNumber()))
+            throw new BadRequestException("Your account is " + sourceAccount.getAccountStatus().name() + ". contact bank to rectify");
+        if(!isAccountActive(destinationAccount.getAccountNumber()))
+            throw new BadRequestException("Can not transfer to your other account because it has been suspended");
+
+        if (payload.amount().compareTo(sourceAccount.getBalance()) > 0)
+            throw new BadRequestException("Insufficient funds in account");
+
+        String customerName = customer.getFirstName() + " " + customer.getLastName();
+
+        accountDailyAuditUtil.initializeDailyAuditIfNotExist(sourceAccount);
+        accountDailyAuditUtil.initializeDailyAuditIfNotExist(destinationAccount);
+
+        //Deduct from sender, credit receiver
+        sourceAccount.setBalance(sourceAccount.getBalance().subtract(payload.amount()));
+        destinationAccount.setBalance(destinationAccount.getBalance().add(payload.amount()));
+
+        Transaction senderTransaction = TransactionUtil.buildTransactionEntity(TransactionType.WITHDRAWAL, TransactionStatus.SUCCESSFUL, sourceAccount,
+                customerName, destinationAccount, destinationAccount.getAccountNumber(), customerName, payload.amount(), "Funding my other account", sourceAccount.getBalance());
+
+        Transaction receiverTransaction = TransactionUtil.buildTransactionEntity(TransactionType.TRANSFER, TransactionStatus.SUCCESSFUL, destinationAccount,
+                customerName, sourceAccount, sourceAccount.getAccountNumber(), customerName, payload.amount(), "Funded by my other account", destinationAccount.getBalance());
+
+
+
+        //Set total daily transfer
+        tierLimiterUtil.recordDailyTransferTotal(sourceAccount.getAccountNumber(), payload.amount());
+
+        //Ledger entry for debit
+        LocalDateTime now = LocalDateTime.now();
+
+        LedgerEntry debit = new LedgerEntry();
+        debit.setEntryType(EntryType.DEBIT);
+        debit.setStatus(LedgerEntryStatus.SETTLED);
+        debit.setAccount(sourceAccount);
+        debit.setAmount(payload.amount());
+        debit.setSettledAt(now);
+
+        //Ledger entry for credit
+        LedgerEntry credit = new LedgerEntry();
+        credit.setEntryType(EntryType.CREDIT);
+        credit.setStatus(LedgerEntryStatus.SETTLED);
+        credit.setAccount(destinationAccount);
+        credit.setAmount(payload.amount());
+        credit.setSettledAt(now);
+
+        //Save transaction to db
+        senderTransaction.addLedger(debit);
+        senderTransaction.addLedger(credit);
+        senderTransaction = transactionRepository.save(senderTransaction);
+        transactionRepository.save(receiverTransaction);
+
+        //Send Transaction notification
+        transactionAlertService.sendDebitAlert(sourceAccount, payload.amount(), now);
+        transactionAlertService.sendCreditAlert(sourceAccount, payload.amount(), now);
+
+        //Update daily transactions table
+        DailyTransactions dailyTransactions = fetchDailyTransactionEntity();
+        dailyTransactions.setTotalCredit(dailyTransactions.getTotalCredit().add(payload.amount()));
+        dailyTransactions.setTotalDebit(dailyTransactions.getTotalDebit().add(payload.amount()));
+
+        dailyTransactionsRepository.save(dailyTransactions);
+        accountDailyAuditUtil.recordDailyAccountAudit(sourceAccount, TransactionType.WITHDRAWAL, payload.amount());
+        accountDailyAuditUtil.recordDailyAccountAudit(destinationAccount, TransactionType.TRANSFER, payload.amount());
+
+        // save audit log
+        User user = securityUtil.getSecurityPrincipal().getUser();
+        auditLogRepository.save(
+                AuditLog.builder()
+                        .actionType(ActionType.DEBIT_TRANSACTION_SUCCESS)
+                        .userId(user.getId())
+                        .userEmail(user.getEmail())
+                        .timeOfCreation(LocalDateTime.now())
+                        .entityType("transactions")
+                        .build());
+
+        return ResponseWrapper.<TransactionStatusResponse>builder()
+                .data(buildTransactionResponse(senderTransaction.getTransactionStatus()))
+                .message("Transaction successful")
+                .statusCode(HttpStatus.CREATED)
+                .build();
     }
 
     @Override
@@ -171,6 +267,9 @@ public class TransactionServiceImpl implements TransactionService {
 
         String payloadCardNumber = payload.cardNumber().trim();
         String payloadCardName = payload.cardName().trim();
+
+
+        accountDailyAuditUtil.initializeDailyAuditIfNotExist(destinationAccount);
 
         CardDetails cardDetails = cardDetailsRepository.findByCardNumber(payloadCardNumber)
                 .orElseThrow(() -> new ResourceNotFoundException("Invalid card. Please use a valid card"));
@@ -190,6 +289,8 @@ public class TransactionServiceImpl implements TransactionService {
             DailyTransactions dailyTransactions = fetchDailyTransactionEntity();
             dailyTransactions.setTotalCredit(dailyTransactions.getTotalCredit().add(payload.depositAmount()));
             dailyTransactionsRepository.save(dailyTransactions);
+
+            accountDailyAuditUtil.recordDailyAccountAudit(destinationAccount, TransactionType.DEPOSIT, payload.depositAmount());
 
             // save audit log
             User user = securityUtil.getSecurityPrincipal().getUser();
@@ -298,16 +399,15 @@ public class TransactionServiceImpl implements TransactionService {
         Customer customer = getAuthenticatedUser();
         Account account = getAuthenticatedUserAccount(customer, accountNumber);
 
-        if(!isAccountActive(account.getAccountNumber()))
+        if (!isAccountActive(account.getAccountNumber()))
             throw new BadRequestException("Your account is " + account.getAccountStatus().name() + ". contact bank to rectify");
 
         List<TransactionHistoryResponseDto> transactions = transactionRepository.findAllByDestinationAccount(account)
                 .stream().map(tran -> new TransactionHistoryResponseDto(tran.getId(),
                         tran.getTransactionType(), tran.getTransactionStatus(), tran.getSourceAccount() != null ? tran.getSourceAccount().getAccountNumber() : null,
+                        tran.getAccountName(), tran.getDestinationAccountNumber(), tran.getDestinationAccountName(),
                         tran.getAmountTransferred(), tran.getDescription(), tran.getCreatedAt()))
                 .toList();
-
-        System.out.println(transactions);
 
         // save audit log
         User user = securityUtil.getSecurityPrincipal().getUser();
@@ -339,7 +439,8 @@ public class TransactionServiceImpl implements TransactionService {
             sourceAccount = null;
 
         TransactionHistoryResponseDto dto =  new TransactionHistoryResponseDto(transaction.getId(),
-                transaction.getTransactionType(), transaction.getTransactionStatus(),sourceAccount,
+                transaction.getTransactionType(), transaction.getTransactionStatus(),sourceAccount, transaction.getAccountName(),
+                transaction.getDestinationAccountNumber(), transaction.getDestinationAccountName(),
                 transaction.getAmountTransferred(), transaction.getDescription(), transaction.getCreatedAt());
 
         // save audit log

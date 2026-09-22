@@ -36,15 +36,27 @@ public class Transaction {
     @JoinColumn(name = "source_account", referencedColumnName = "account_number")
     private Account sourceAccount;
 
+    @Column(name = "source_account_name")
+    private String accountName;
+
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "destination_account", referencedColumnName = "account_number", nullable = false)
+    @JoinColumn(name = "destination_account", referencedColumnName = "account_number")
     private Account destinationAccount;
+
+    @Column(name = "destination_account_number")
+    private String destinationAccountNumber;
+
+    @Column(name = "Destination_account_name")
+    private String destinationAccountName;
 
     @Column(name = "amount_transferred", nullable = false, precision = 19, scale = 2)
     private BigDecimal amountTransferred;
 
     @Column(name = "description", nullable = false, length = 50)
     private String description;
+
+    @Column(name = "balance_after_transaction")
+    private BigDecimal balanceAfterTransfer;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;

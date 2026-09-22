@@ -1,9 +1,6 @@
 package com.groupa.digitalbackendapplication.controller;
 
-import com.groupa.digitalbackendapplication.domain.dto.request.ChangePasswordRequest;
-import com.groupa.digitalbackendapplication.domain.dto.request.ChangeTransactionPinRequest;
-import com.groupa.digitalbackendapplication.domain.dto.request.SecondaryAccountCreationRequest;
-import com.groupa.digitalbackendapplication.domain.dto.request.TransactionPinRequest;
+import com.groupa.digitalbackendapplication.domain.dto.request.*;
 import com.groupa.digitalbackendapplication.domain.dto.response.AccountCreatedResponse;
 import com.groupa.digitalbackendapplication.domain.dto.response.CustomerDto;
 import com.groupa.digitalbackendapplication.domain.dto.response.ResponseWrapper;
@@ -13,8 +10,11 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/account")
@@ -64,5 +64,23 @@ public class AccountController {
     @PatchMapping("/password-reset")
     public ResponseWrapper<String> changePassword(@Valid ChangePasswordRequest payload){
         return customerService.changePassword(payload);
+    }
+
+    @Operation(security = @SecurityRequirement(name = "bearerAuth"))
+    @PostMapping("/get-statement-via-email")
+    public ResponseWrapper<String> generateAndSendStatementViaEmail(@RequestBody @Valid GenerateStatementRequest payload){
+        return customerService.generateStatementViaEmail(payload);
+    }
+
+    @Operation(security = @SecurityRequirement(name = "bearerAuth"))
+    @GetMapping("/download-pdf-receipt/{transaction-id}")
+    public ResponseEntity<byte[]> downloadReceipt(@PathVariable("transaction-id") UUID TransactionId){
+        return customerService.generateReceipt(TransactionId);
+    }
+
+    @Operation(security = @SecurityRequirement(name = "bearerAuth"))
+    @PostMapping("/download-statement")
+    public ResponseEntity<byte[]> downloadStatement(@RequestBody @Valid GenerateStatementRequest payload){
+        return customerService.generateStatement(payload);
     }
 }

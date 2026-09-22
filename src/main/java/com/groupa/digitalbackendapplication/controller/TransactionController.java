@@ -2,6 +2,7 @@ package com.groupa.digitalbackendapplication.controller;
 
 import com.groupa.digitalbackendapplication.domain.dto.request.CardDetailsRequest;
 import com.groupa.digitalbackendapplication.domain.dto.request.TransferFundsRequest;
+import com.groupa.digitalbackendapplication.domain.dto.request.TransferWithinAccount;
 import com.groupa.digitalbackendapplication.domain.dto.response.ResponseWrapper;
 import com.groupa.digitalbackendapplication.domain.dto.response.TransactionHistoryResponseDto;
 import com.groupa.digitalbackendapplication.domain.dto.response.TransactionStatusResponse;
@@ -34,6 +35,12 @@ public class TransactionController {
     @Operation(summary = "Transfer funds", method = "POST")
     public ResponseEntity<ResponseWrapper<TransactionStatusResponse>> transferFunds(@Valid @RequestBody TransferFundsRequest payload){
         return ResponseEntity.status(HttpStatus.CREATED).body(transactionService.transferFunds(payload));
+    }
+
+    @Operation(summary = "Transfer funds within users account", method = "POST")
+    @PostMapping("/transfer-within-user-accounts")
+    public ResponseEntity<ResponseWrapper<TransactionStatusResponse>> transferWithinUserAccounts(@Valid @RequestBody TransferWithinAccount payload){
+        return ResponseEntity.status(HttpStatus.CREATED).body(transactionService.transferWithinUserAccount(payload));
     }
 
     @PostMapping("/deposit")
