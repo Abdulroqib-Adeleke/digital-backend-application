@@ -11,7 +11,7 @@ public class TransactionUtil {
 
     public static Transaction buildTransactionEntity(TransactionType transactionType, TransactionStatus transactionStatus,
                                                Account sourceAccount, String sourceAccountName, Account destinationAccount, String destinationAccountNumber, String destinationAccountName, BigDecimal amount,
-                                               String description){
+                                               String description, BigDecimal balanceAfterTransfer){
         return Transaction.builder()
                 .transactionType(transactionType)
                 .transactionStatus(transactionStatus)
@@ -22,6 +22,7 @@ public class TransactionUtil {
                 .destinationAccountName(destinationAccountName)
                 .amountTransferred(amount)
                 .description(description)
+                .balanceAfterTransfer(balanceAfterTransfer)
                 .build();
     }
 }

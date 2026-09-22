@@ -16,7 +16,8 @@ import java.util.UUID;
 
 public interface AccountDailyAuditRepository extends JpaRepository<AccountDailyAudit, UUID> {
 
-    AccountDailyAudit findByAccountIdAndDate(UUID accountId, LocalDate date);
+    Optional<AccountDailyAudit> findFirstByAccountIdAndDateGreaterThanEqualOrderByDateAsc(UUID accountId, LocalDate date);
+    Optional<AccountDailyAudit> findFirstByAccountIdAndDateLessThanEqualOrderByDateDesc(UUID accountId, LocalDate date);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select a from AccountDailyAudit a " +
@@ -25,4 +26,5 @@ public interface AccountDailyAuditRepository extends JpaRepository<AccountDailyA
                                               @Param("date") LocalDate date);
 
     Optional<AccountDailyAudit> findFirstByAccountIdOrderByDateDesc(UUID accountId);
+    Optional<AccountDailyAudit> findByAccountIdAndDate(UUID accountId, LocalDate date);
 }

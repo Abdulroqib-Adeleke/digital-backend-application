@@ -2,6 +2,7 @@ package com.groupa.digitalbackendapplication.repository;
 
 import com.groupa.digitalbackendapplication.domain.entities.Account;
 import com.groupa.digitalbackendapplication.domain.entities.Transaction;
+import com.groupa.digitalbackendapplication.domain.enums.TransactionStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -23,11 +24,13 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
     Optional<Transaction> findById(UUID id);
 
     @Query("SELECT t FROM Transaction t WHERE t.sourceAccount = :account or t.destinationAccount = :account " +
+            "AND t.transactionStatus =:transactionStatus " +
             "AND t.createdAt >= :startDate " +
             "AND t.createdAt <= :endDate or t.updatedAt <= :endDate " +
-            "ORDER BY t.createdAt DESC")
-    List<Transaction> findTransactionsByAccountAndDateRange(
+            "ORDER BY t.updatedAt DESC")
+    List<Transaction> findTransactionsByAccountAndTransactionStatusAndDateRange(
             @Param("account") Account account,
+            @Param("transactionStatus") TransactionStatus transactionStatus,
             @Param("startDate") LocalDateTime startDate,
             @Param("endDate") LocalDateTime endDate
     );

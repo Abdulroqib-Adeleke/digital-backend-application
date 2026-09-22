@@ -352,7 +352,7 @@ public class CustomerServiceImpl implements CustomerService {
     }
 
     @Override
-    public ResponseWrapper<String> generateStatement(GenerateStatementRequest payload) {
+    public ResponseWrapper<String> generateStatementViaEmail(GenerateStatementRequest payload) {
 
         AuthUser loggedInUser = securityUtil.getSecurityPrincipal();
         loginSessionUtil.verify(loggedInUser.getUser().getId());
@@ -360,34 +360,7 @@ public class CustomerServiceImpl implements CustomerService {
         Customer customer = customerRepository.findById(loggedInUser.getUser().getId())
                 .orElseThrow(()-> new RuntimeException("Error occurred, try again"));
 
-        String accountName = customer.getFirstName() + " " + customer.getLastName();
-
-        Set<Account> accounts = customer.getAccounts();
-
-
-        Optional<Account> account = accounts.stream()
-                .filter(account1 -> account1.getAccountNumber().equals(payload.accountNumber()))
-                .findFirst();
-
-        if(account.isEmpty()) throw new BadRequestException("Access denied");
-
-        Account userAccount = account.get();
-
-        AccountDailyAudit opening = accountDailyAuditRepository.findByAccountIdAndDate(userAccount.getId(), payload.from());
-        AccountDailyAudit closing = accountDailyAuditRepository.findByAccountIdAndDate(userAccount.getId(), payload.to());
-
-        LocalDateTime start = payload.from().atStartOfDay();
-
-        LocalDateTime endOfDay = payload.to().atTime(LocalTime.MAX);
-
-        List<Transaction> transactions =  buildTransactions(userAccount, start, endOfDay);
-
-        List<StatementLine> statementLines = buildStatementLines(transactions,opening.getOpeningAmount());
-
-        StatementData data = new StatementData(accountName, payload.accountNumber(), userAccount.getPersonalAccountType().name(),
-                payload.from(), payload.to(), opening.getOpeningAmount(), closing.getClosingAmount(), statementLines);
-
-        byte[] statementPDF = statementPdfService.generate(data);
+        byte[] statementPDF = generateStatementPDF(customer, payload);
 
         EmailDetails emailDetails = EmailDetails.builder()
                 .subject("Bank Statement")
@@ -412,6 +385,27 @@ public class CustomerServiceImpl implements CustomerService {
                 .statusCode(HttpStatus.OK)
                 .build();
 
+    }
+
+    @Override
+    public ResponseEntity<byte[]> generateStatement(GenerateStatementRequest payload) {
+        AuthUser loggedInUser = securityUtil.getSecurityPrincipal();
+        loginSessionUtil.verify(loggedInUser.getUser().getId());
+
+        Customer customer = customerRepository.findById(loggedInUser.getUser().getId())
+                .orElseThrow(()-> new RuntimeException("Error occurred, try again"));
+
+        byte[] statementPDF = generateStatementPDF(customer, payload);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentDisposition(
+                ContentDisposition.attachment()
+                        .filename("Bank-statement" + customer.getFirstName() + ".pdf")
+                        .build());
+        headers.setContentLength(statementPDF.length);
+
+        return new ResponseEntity<>(statementPDF, headers, HttpStatus.CREATED);
     }
 
     private SavedCustomerResponse buildCustomerDetails(String firstName, String lastName, String email, String password, String phoneNumber, Role role, Gender gender, LocalDate dateOfBirth, String address){
@@ -528,19 +522,15 @@ public class CustomerServiceImpl implements CustomerService {
         return "Transaction code set successful";
     }
 
-    private List<StatementLine>  buildStatementLines(List<Transaction> transactions, BigDecimal openingBalance){
+    private List<StatementLine>  buildStatementLines(List<Transaction> transactions){
 
         List<Transaction> sorted = transactions.stream()
                 .sorted(Comparator.comparing(Transaction::getCreatedAt))
                 .toList();
 
-        BigDecimal running = openingBalance;
         List<StatementLine> statementLines = new ArrayList<>();
 
         for (Transaction t : sorted) {
-            boolean withdraw = t.getTransactionType() == TransactionType.WITHDRAWAL;
-            running = withdraw ? running.subtract(t.getAmountTransferred())
-                    : running.add(t.getAmountTransferred());
 
             String details = "";
             String type = "";
@@ -565,16 +555,28 @@ public class CustomerServiceImpl implements CustomerService {
                     type,
                     credit,
                     t.getAmountTransferred(),
-                    running));
+                    t.getBalanceAfterTransfer()));
         }
 
         return statementLines;
     }
 
     private List<Transaction> buildTransactions(Account account, LocalDateTime startDate, LocalDateTime endDate){
+        List<Transaction> transactions = new ArrayList<>();
+        
+        List<Transaction> transactionList = transactionRepository.findTransactionsByAccountAndTransactionStatusAndDateRange(
+                account, TransactionStatus.SUCCESSFUL, startDate, endDate);
+        
+        for (Transaction t : transactionList) {
+            if(t.getTransactionType() == TransactionType.WITHDRAWAL && t.getSourceAccount().equals(account))
+                transactions.add(t);
+            else if (t.getTransactionType() == TransactionType.DEPOSIT && t.getDestinationAccount().equals(account))
+                transactions.add(t);
+            else if (t.getTransactionType() == TransactionType.TRANSFER && t.getSourceAccount().equals(account))
+                transactions.add(t);
+        }
 
-        return transactionRepository.findTransactionsByAccountAndDateRange(account, startDate, endDate);
-
+        return transactions;
     }
 
     private byte[] generateTransactionReceipt(UUID userId, UUID transactionId){
@@ -591,5 +593,45 @@ public class CustomerServiceImpl implements CustomerService {
         byte[] receiptPDF = receiptPdfService.generatePDF(dto);
 
         return receiptPDF;
+    }
+
+    private byte[] generateStatementPDF(Customer customer, GenerateStatementRequest payload){
+
+        String accountName = customer.getFirstName() + " " + customer.getLastName();
+
+        Set<Account> accounts = customer.getAccounts();
+
+
+        Optional<Account> account = accounts.stream()
+                .filter(account1 -> account1.getAccountNumber().equals(payload.accountNumber()))
+                .findFirst();
+
+        if(account.isEmpty()) throw new BadRequestException("Access denied");
+
+        Account userAccount = account.get();
+
+        Optional<AccountDailyAudit> openingOptional = accountDailyAuditRepository
+                .findFirstByAccountIdAndDateGreaterThanEqualOrderByDateAsc(userAccount.getId(), payload.from());
+        Optional<AccountDailyAudit> closingOptional = accountDailyAuditRepository
+                .findFirstByAccountIdAndDateLessThanEqualOrderByDateDesc(userAccount.getId(), payload.to());
+
+        if(openingOptional.isEmpty() && closingOptional.isEmpty())
+            throw new BadRequestException("Could not find transactions for statement generation");
+
+        AccountDailyAudit opening =  openingOptional.get();
+        AccountDailyAudit closing =  closingOptional.get();
+
+        LocalDateTime start = payload.from().atStartOfDay();
+
+        LocalDateTime endOfDay = payload.to().atTime(LocalTime.MAX);
+
+        List<Transaction> transactions =  buildTransactions(userAccount, start, endOfDay);
+
+        List<StatementLine> statementLines = buildStatementLines(transactions);
+
+        StatementData data = new StatementData(accountName, payload.accountNumber(), userAccount.getPersonalAccountType().name(),
+                payload.from(), payload.to(), opening.getOpeningAmount(), closing.getClosingAmount(), statementLines);
+
+        return statementPdfService.generate(data);
     }
 }

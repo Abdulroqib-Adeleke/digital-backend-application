@@ -69,12 +69,18 @@ public class AccountController {
     @Operation(security = @SecurityRequirement(name = "bearerAuth"))
     @PostMapping("/get-statement-via-email")
     public ResponseWrapper<String> generateAndSendStatementViaEmail(@RequestBody @Valid GenerateStatementRequest payload){
-        return customerService.generateStatement(payload);
+        return customerService.generateStatementViaEmail(payload);
     }
 
     @Operation(security = @SecurityRequirement(name = "bearerAuth"))
     @GetMapping("/download-pdf-receipt/{transaction-id}")
     public ResponseEntity<byte[]> downloadReceipt(@PathVariable("transaction-id") UUID TransactionId){
         return customerService.generateReceipt(TransactionId);
+    }
+
+    @Operation(security = @SecurityRequirement(name = "bearerAuth"))
+    @PostMapping("/download-statement")
+    public ResponseEntity<byte[]> downloadStatement(@RequestBody @Valid GenerateStatementRequest payload){
+        return customerService.generateStatement(payload);
     }
 }

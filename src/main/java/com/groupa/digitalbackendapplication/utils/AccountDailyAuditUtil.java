@@ -18,6 +18,15 @@ public class AccountDailyAuditUtil {
 
     private final AccountDailyAuditRepository  accountDailyAuditRepository;
 
+
+    public void initializeDailyAuditIfNotExist(Account account) {
+        Optional<AccountDailyAudit> audit = accountDailyAuditRepository.findByAccountIdAndDate(account.getId(), LocalDate.now());
+        if(audit.isEmpty()){
+            accountDailyAuditRepository.save(new AccountDailyAudit(account, account.getBalance(), account.getBalance(),
+                    LocalDate.now()));
+        }
+    }
+
     public void recordDailyAccountAudit(Account account, TransactionType transactionType, BigDecimal amount) {
 
         Optional<AccountDailyAudit> accountLastAuditOptional = accountDailyAuditRepository
@@ -32,7 +41,9 @@ public class AccountDailyAuditUtil {
                         new AccountDailyAudit(account, accountLastDailyAudit.getClosingAmount(),
                                 accountLastDailyAudit.getClosingAmount(), LocalDate.now()));
 
-        BigDecimal newClosing =  BigDecimal.ZERO;
+        BigDecimal newClosing =  dailyAudit.getClosingAmount();
+
+        if(dailyAudit.getClosingAmount().compareTo(BigDecimal.ZERO) > 0) {}
 
         if(transactionType.equals(TransactionType.DEPOSIT) || transactionType.equals(TransactionType.TRANSFER)){
             newClosing = newClosing.add(amount);

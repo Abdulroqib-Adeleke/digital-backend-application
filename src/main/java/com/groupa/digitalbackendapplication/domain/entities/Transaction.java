@@ -55,6 +55,9 @@ public class Transaction {
     @Column(name = "description", nullable = false, length = 50)
     private String description;
 
+    @Column(name = "balance_after_transaction")
+    private BigDecimal balanceAfterTransfer;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 

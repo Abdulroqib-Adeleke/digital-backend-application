@@ -33,5 +33,7 @@ public interface CustomerService {
 
     ResponseEntity<byte[]> generateReceipt(UUID transactionId);
 
-    ResponseWrapper<String> generateStatement(GenerateStatementRequest payload);
+    ResponseWrapper<String> generateStatementViaEmail(GenerateStatementRequest payload);
+
+    ResponseEntity<byte[]> generateStatement(GenerateStatementRequest payload);
 }

@@ -37,11 +37,12 @@ public class CardDepositServiceImpl implements DepositService {
 
         String name = customer.getFirstName() + " " + customer.getLastName();
 
-        Transaction transaction = TransactionUtil.buildTransactionEntity(TransactionType.DEPOSIT, TransactionStatus.SUCCESSFUL,
-                null,null, account, account.getAccountNumber(), name, depositAmount, payload.description());
-
         //Fund account
         account.setBalance(account.getBalance().add(depositAmount));
+
+        Transaction transaction = TransactionUtil.buildTransactionEntity(TransactionType.DEPOSIT, TransactionStatus.SUCCESSFUL,
+                null,null, account, account.getAccountNumber(), name, depositAmount, payload.description(), account.getBalance());
+
 
         LocalDateTime now = LocalDateTime.now();
 
@@ -74,7 +75,7 @@ public class CardDepositServiceImpl implements DepositService {
         BigDecimal depositAmount = payload.depositAmount();
 
         Transaction transaction = TransactionUtil.buildTransactionEntity(TransactionType.DEPOSIT, TransactionStatus.PENDING,
-                null, null, account, account.getAccountNumber(), name, depositAmount, payload.description().trim());
+                null, null, account, account.getAccountNumber(), name, depositAmount, payload.description().trim(), account.getBalance());
 
         LedgerEntry debitEntry = new LedgerEntry();
         debitEntry.setAccount(null);

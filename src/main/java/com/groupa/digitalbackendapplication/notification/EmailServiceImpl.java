@@ -73,7 +73,6 @@ public class EmailServiceImpl implements EmailService {
                     .retrieve()
                     .toBodilessEntity();
         } catch (RestClientResponseException e) {
-            // 4xx/5xx from the provider: the response body says why
             throw new RuntimeException("Email sending failed: " + e.getStatusCode()
                     + " " + e.getResponseBodyAsString(), e);
         } catch (RestClientException e) {
