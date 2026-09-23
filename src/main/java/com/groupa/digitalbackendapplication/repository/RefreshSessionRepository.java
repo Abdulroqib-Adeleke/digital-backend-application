@@ -8,5 +8,5 @@ import java.util.UUID;
 
 public interface RefreshSessionRepository extends JpaRepository<RefreshSession, UUID> {
     Optional<RefreshSession> findByUserId(UUID userId);
-    void deleteByUserId(UUID userId);
+    Optional<RefreshSession> findByToken(String token);
 }

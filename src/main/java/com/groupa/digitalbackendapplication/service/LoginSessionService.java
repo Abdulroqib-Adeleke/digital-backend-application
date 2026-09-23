@@ -7,7 +7,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface LoginSessionService {
-    void saveLoginSession(UUID userId);
+    void saveLoginSession(UUID userId, String sessionId);
     void invalidateLoginSession(UUID userId);
     Optional<LoginSession> getLoginSession(UUID userId);
+    String getActiveSessionId(UUID userId);
 }

@@ -1,5 +1,8 @@
 package com.groupa.digitalbackendapplication.security;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.groupa.digitalbackendapplication.domain.dto.helper.TokenClaims;
+import com.groupa.digitalbackendapplication.exceptions.ErrorResponse;
 import com.groupa.digitalbackendapplication.service.LoginSessionService;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
@@ -10,16 +13,19 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.coyote.BadRequestException;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.UUID;
 
 @Component
 @Slf4j
@@ -27,37 +33,51 @@ import java.io.IOException;
 public class AuthFilter extends OncePerRequestFilter {
 
     private final TokenService tokenService;
-    private final CustomUserDetailsService customUserDetailsService;
+    private final UserDetailsService userDetailsService;
+    private final LoginSessionService loginSessionService;
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
-            throws ServletException, IOException {
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
+
+        String authHeader = request.getHeader("Authorization");
+        String token = null;
+        TokenClaims claims = null;
+
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            token = authHeader.substring(7);
+            claims = tokenService.extractTokenClaims(token);
+        }
 
         try {
-            String token = getTokenFromRequest(request);
+            if(claims != null && claims.getUsername() != null && SecurityContextHolder.getContext().getAuthentication() == null) {
 
-            if (token != null) {
-
-                if (request.getServletPath().equals("/api/auth/new-access-token")) {
-                    filterChain.doFilter(request, response);
+                if(claims.getTenancyId() == null || claims.getUsername() == null){
+                    response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                    response.getWriter().write("Invalid token");
                     return;
                 }
 
-                if (tokenService.containsRefreshToken(token)) {
-                    throw new BadRequestException("Invalid token");
+                UserDetails userDetails = userDetailsService.loadUserByUsername(claims.getUsername());
+                String activeSessionId = loginSessionService.getActiveSessionId(UUID.fromString(claims.getTenancyId()));
+
+                if(!activeSessionId.equals(claims.getUserSessionId())){
+                    response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                    response.getWriter().write("Invalid token");
+                    return;
+                }
+                if(tokenService.isTokenValid(token, userDetails)){
+                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                            userDetails,
+                            null,
+                            userDetails.getAuthorities());
+
+                    authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    SecurityContextHolder.getContext().setAuthentication(authToken);
                 }
 
-                String email = tokenService.getUsernameFromToken(token);
-
-                UserDetails userDetails = customUserDetailsService.loadUserByUsername(email);
-
-                if (StringUtils.hasText(email) && tokenService.isTokenValid(token, userDetails)) {
-                    UsernamePasswordAuthenticationToken authenticationToken =
-                            new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
-                    authenticationToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                    SecurityContextHolder.getContext().setAuthentication(authenticationToken);
-                }
             }
+            filterChain.doFilter(request, response);
+
         } catch (BadRequestException e) {
             log.error("Use the right access token");
             response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
@@ -82,16 +102,18 @@ public class AuthFilter extends OncePerRequestFilter {
             response.getWriter().write("{\"message\":\"Authentication failed. Please log in again.\",\"statusCode\":401}");
             return;
         }
-
-        // Pass request to the next filter/controller — let Spring handle any errors from here
-        filterChain.doFilter(request, response);
     }
 
-    private String getTokenFromRequest(HttpServletRequest request) {
-        String tokenWithBearer = request.getHeader("Authorization");
-        if (tokenWithBearer != null && tokenWithBearer.startsWith("Bearer ")) {
-            return tokenWithBearer.substring(7);
-        }
-        return null;
+    private void formatResponse(HttpServletResponse response, String message, HttpStatus httpStatus, int httpServletResponse) throws IOException {
+        ErrorResponse error = ErrorResponse.builder()
+                .statusCode(httpStatus.value())
+                .message(message)
+                .build();
+
+        response.setStatus(httpServletResponse);
+        response.setContentType("application/json");
+
+        response.getWriter()
+                .write(new ObjectMapper().writeValueAsString(error));
     }
 }

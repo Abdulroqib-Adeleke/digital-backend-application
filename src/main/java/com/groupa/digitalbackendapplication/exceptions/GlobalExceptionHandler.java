@@ -7,9 +7,6 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.web.bind.annotation.ResponseStatus;
-
-import java.nio.file.AccessDeniedException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -56,6 +53,16 @@ public class GlobalExceptionHandler {
                 .build();
 
         return new ResponseEntity<>(response, HttpStatus.UNAUTHORIZED);
+    }
+
+    public ResponseEntity<ErrorResponse> handleInvalidTokenException(InvalidTokenException ex){
+
+        ErrorResponse response = ErrorResponse.builder()
+                .message(ex.getMessage())
+                .statusCode(HttpStatus.EXPECTATION_FAILED.value())
+                .build();
+
+        return new ResponseEntity<>(response, HttpStatus.EXPECTATION_FAILED);
     }
 
     @ExceptionHandler()

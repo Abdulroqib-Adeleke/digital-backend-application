@@ -68,9 +68,9 @@ public class AuthController {
         return ResponseEntity.ok(authService.logout());
     }
 
-    @PostMapping("/new-access-token")
-    public ResponseEntity<Response<LoginResponse>> getNewAccessToken(HttpServletRequest request, HttpServletResponse response){
-        return ResponseEntity.ok( authService.getNewAccessToken(request, response) );
+    @GetMapping("/new-access-token/{refresh-token}")
+    public ResponseEntity<Response<LoginResponse>> getNewAccessToken(@PathVariable("refresh-token") String refreshToken){
+        return ResponseEntity.ok( authService.getNewAccessToken(refreshToken) );
     }
 
     @PatchMapping("/forget-password/customer")

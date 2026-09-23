@@ -1,6 +1,7 @@
 package com.groupa.digitalbackendapplication.service.impl;
 
 import com.groupa.digitalbackendapplication.domain.entities.LoginSession;
+import com.groupa.digitalbackendapplication.exceptions.ResourceNotFoundException;
 import com.groupa.digitalbackendapplication.repository.LoginSessionRepository;
 import com.groupa.digitalbackendapplication.service.LoginSessionService;
 import lombok.RequiredArgsConstructor;
@@ -19,10 +20,11 @@ public class LoginSessionServiceImpl implements LoginSessionService {
     private final LoginSessionRepository loginSessionRepository;
 
     @Override
-    public void saveLoginSession(UUID userId) {
+    public void saveLoginSession(UUID userId, String sessionId) {
         Optional<LoginSession> loginSessionOptional = loginSessionRepository.findByUserId(userId);
         if (loginSessionOptional.isPresent()) {
             LoginSession loginSession = loginSessionOptional.get();
+            loginSession.setActiveSessionId(sessionId);
             loginSession.setLoggedIn(Boolean.TRUE);
             loginSession.setTimeOfLogin(LocalDateTime.now());
             loginSessionRepository.save(loginSession);
@@ -30,6 +32,7 @@ public class LoginSessionServiceImpl implements LoginSessionService {
             LoginSession newLoginSession = LoginSession.builder()
                     .loggedIn(Boolean.TRUE)
                     .userId(userId)
+                    .activeSessionId(sessionId)
                     .timeOfLogin(LocalDateTime.now())
                     .build();
             loginSessionRepository.save(newLoginSession);
@@ -38,18 +41,22 @@ public class LoginSessionServiceImpl implements LoginSessionService {
 
     @Override
     public void invalidateLoginSession(UUID userId) {
+
         Optional<LoginSession> loginSessionOptional = loginSessionRepository.findByUserId(userId);
-        if (loginSessionOptional.isPresent()) {
-            LoginSession loginSession = loginSessionOptional.get();
-            loginSession.setLoggedIn(Boolean.FALSE);
-            loginSession.setTimeOfLogout(LocalDateTime.now());
-            loginSessionRepository.save(loginSession);
-            System.out.println("Logout invalidated");
-        }
+        loginSessionOptional.ifPresent(loginSessionRepository::delete);
     }
 
     @Override
     public Optional<LoginSession> getLoginSession(UUID userId) {
+
         return loginSessionRepository.findByUserId(userId);
+    }
+
+    @Override
+    public String getActiveSessionId(UUID userId) {
+        LoginSession loginSessionOptional = loginSessionRepository.findByUserId(userId)
+                .orElseThrow(()-> new ResourceNotFoundException("Something went Wrong"));
+
+        return loginSessionOptional.getActiveSessionId();
     }
 }

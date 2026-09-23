@@ -26,8 +26,14 @@ public class RefreshSession {
     @Column(name = "active_session_id", length = 50)
     private String activeSessionId;
 
+    @Column(name = "hashed_token")
+    private String token;
+
     @Column(name = "user_id")
     private UUID userId;
+
+    @Column(name = "expiry_time")
+    private LocalDateTime expiryDate;
 
     @Column(name = "created_date")
     @CreationTimestamp
