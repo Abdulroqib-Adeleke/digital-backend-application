@@ -12,6 +12,7 @@ import com.groupa.digitalbackendapplication.domain.dto.response.LoginResponse;
 import com.groupa.digitalbackendapplication.domain.dto.response.LogoutResponse;
 import com.groupa.digitalbackendapplication.domain.dto.response.Response;
 import com.groupa.digitalbackendapplication.domain.enums.PersonalAccountType;
+import com.groupa.digitalbackendapplication.exceptions.AccessDeniedException;
 import com.groupa.digitalbackendapplication.exceptions.BadRequestException;
 import com.groupa.digitalbackendapplication.exceptions.ResourceNotFoundException;
 import com.groupa.digitalbackendapplication.notification.EmailDetails;
@@ -32,6 +33,9 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -46,6 +50,7 @@ import java.util.UUID;
 @Slf4j
 public class AuthServiceImpl implements AuthService {
 
+    private final AuthenticationManager authenticationManager;
     private final CustomerRepository customerRepository;
     private final PasswordEncoder passwordEncoder;
     private final TokenService tokenService;
@@ -82,24 +87,9 @@ public class AuthServiceImpl implements AuthService {
         if(account.getAccountStatus() == AccountStatus.FROZEN)
             throw new BadRequestException("Account suspended, contact admin to rectify");
 
-        String role = authUser.getUser().getRole().name();
-        UUID userId = authUser.getUser().getId();
+        Response<LoginResponse> response = getLoginResponse(loginRequest, authUser.getUser());
 
-        String token = tokenService.generateToken(authUser.getUsername());
-        String refreshToken = tokenService.generateRefreshToken(authUser.getUsername());
-
-        String sessionId = LocalDateTime.now().toString();
-
-        refreshSessionService.createLoginSession(sessionId, userId);
-
-        loginSessionService.saveLoginSession(userId);
-
-        UsernamePasswordAuthenticationToken authenticationToken =
-                new UsernamePasswordAuthenticationToken(authUser, null, authUser.getAuthorities());
-
-        SecurityContextHolder.getContext().setAuthentication(authenticationToken);
-
-        Customer customer = customerRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("Customer not found"));
+        Customer customer = customerRepository.findById(authUser.getUser().getId()).orElseThrow(() -> new ResourceNotFoundException("Customer not found"));
 
         EmailDetails emailDetails = EmailDetails.builder()
                 .recipient(customer.getEmail())
@@ -117,27 +107,17 @@ public class AuthServiceImpl implements AuthService {
                 .build();
         emailService.sendEmail(emailDetails);
 
-        LoginResponse loginResponse = LoginResponse.builder()
-                .role(role)
-                .accessToken(token)
-                .refreshToken(refreshToken)
-                .build();
-
         // save audit log
         auditLogRepository.save(
                 AuditLog.builder()
                         .actionType(ActionType.USER_LOGIN)
-                        .userId(userId)
+                        .userId(authUser.getUser().getId())
                         .userEmail(email)
                         .timeOfCreation(LocalDateTime.now())
                         .entityType("customer")
                         .build());
 
-        return Response.<LoginResponse>builder()
-                .statusCode(HttpStatus.OK.value())
-                .message("Login successful")
-                .data(loginResponse)
-                .build();
+        return response;
     }
 
     @Override
@@ -151,28 +131,8 @@ public class AuthServiceImpl implements AuthService {
             throw new BadRequestException("Password does not match");
         }
 
-        String role = authUser.getUser().getRole().name();
-        UUID userId = authUser.getUser().getId();
+        Response<LoginResponse> response = getLoginResponse(payload, authUser.getUser());
 
-        String token = tokenService.generateToken(authUser.getUsername());
-        String refreshToken = tokenService.generateRefreshToken(authUser.getUsername());
-
-        String sessionId = LocalDateTime.now().toString();
-
-        refreshSessionService.createLoginSession(sessionId, userId);
-
-        loginSessionService.saveLoginSession(userId);
-
-        UsernamePasswordAuthenticationToken authenticationToken =
-                new UsernamePasswordAuthenticationToken(authUser, null, authUser.getAuthorities());
-
-        SecurityContextHolder.getContext().setAuthentication(authenticationToken);
-
-        LoginResponse loginResponse = LoginResponse.builder()
-                .role(role)
-                .accessToken(token)
-                .refreshToken(refreshToken)
-                .build();
 
         EmailDetails emailDetails = EmailDetails.builder()
                 .recipient(admin.getEmail())
@@ -194,87 +154,32 @@ public class AuthServiceImpl implements AuthService {
         auditLogRepository.save(
                 AuditLog.builder()
                         .actionType(ActionType.ADMIN_REGISTRATION)
-                        .userId(userId)
+                        .userId(authUser.getUser().getId())
                         .userEmail(admin.getEmail())
                         .timeOfCreation(LocalDateTime.now())
                         .entityType("admin")
                         .build());
 
-        return Response.<LoginResponse>builder()
-                .statusCode(HttpStatus.OK.value())
-                .message("Login successful")
-                .data(loginResponse)
-                .build();
+        return response;
     }
 
-    public Response<LoginResponse> getNewAccessToken(HttpServletRequest request, HttpServletResponse response) {
-        // get the refresh token
-        String refreshHeader = request.getHeader("Authorization");
-        if (refreshHeader == null || !refreshHeader.startsWith("Bearer ")) {
-            throw new ResourceNotFoundException("Authorization header missing");
-        }
+    public Response<LoginResponse> getNewAccessToken(String refreshToken) {
 
-        // get the refresh token
-        String refreshToken = refreshHeader.substring(7);
+        User user = refreshSessionService.validate(refreshToken);
 
-        // extract the username
-        String username = tokenService.getUsernameFromToken(refreshToken);
+        Response<LoginResponse> response = buildLoginResponse(user, user.getEmail());
 
-        // check if the user exist
-        AuthUser userDetails = (AuthUser) customUserDetailsService.loadUserByUsername(username);
+        // save audit log
+        auditLogRepository.save(
+                AuditLog.builder()
+                        .actionType(ActionType.ANOTHER_ACCESS_TOKEN)
+                        .userId(user.getId())
+                        .userEmail(user.getEmail())
+                        .timeOfCreation(LocalDateTime.now())
+                        .entityType("user")
+                        .build());
 
-        // get customer from repository
-        Customer customer = customerRepository.findByEmail(userDetails.getUsername())
-                .orElseThrow(() -> new ResourceNotFoundException("User not found") );
-
-        // if logout, refresh session should be null, thus a new refresh token should be gotten by login
-        String refreshSession = refreshSessionService.getUserSession(customer.getId());
-
-        if (refreshSession == null) throw new BadRequestException("Refresh token invalid. Please login to get a new one");
-
-        // check if refresh token is valid
-        if (tokenService.validateRefreshToken(refreshToken)) {
-            // invalidate previous session
-            refreshSessionService.invalidateLoginSession(customer.getId());
-
-            // generate new session id
-            String sessionId = LocalDateTime.now().toString();
-
-            // generate new access token
-            String newAccessToken = tokenService.generateToken(customer.getEmail());
-            // generate new refresh token
-            String newRefreshToken = tokenService.generateRefreshToken(customer.getEmail());
-
-            // save new session id into refresh session table
-            refreshSessionService.createLoginSession(sessionId, customer.getId());
-
-            LoginResponse loginResponse = LoginResponse.builder()
-                    .accessToken(newAccessToken)
-                    .refreshToken(newRefreshToken)
-                    .role(customer.getRole().name())
-                    .build();
-
-            // save audit log
-            auditLogRepository.save(
-                    AuditLog.builder()
-                            .actionType(ActionType.ANOTHER_ACCESS_TOKEN)
-                            .userId(customer.getId())
-                            .userEmail(customer.getEmail())
-                            .timeOfCreation(LocalDateTime.now())
-                            .entityType("user")
-                            .build());
-
-            System.out.println("Audit log saved");
-
-            return Response.<LoginResponse>builder()
-                    .statusCode(HttpStatus.OK.value())
-                    .message("Login successful")
-                    .data(loginResponse)
-                    .build();
-        } else {
-            throw new BadRequestException("Something went wrong");
-        }
-
+        return response;
     }
 
     @Override
@@ -360,6 +265,37 @@ public class AuthServiceImpl implements AuthService {
         return ResponseWrapper.<String>builder()
                 .message("Password reset successful")
                 .statusCode(HttpStatus.ACCEPTED)
+                .build();
+    }
+
+    private Response<LoginResponse> getLoginResponse(LoginRequest payload, User user) {
+        
+        try {
+
+            return buildLoginResponse(user, payload.getEmail());
+
+        }catch (BadCredentialsException ex){
+            log.error("Error occurred: ",ex);
+            throw new AccessDeniedException("Invalid authentication credentials");
+        }
+    }
+
+    private Response<LoginResponse> buildLoginResponse(User user, String email){
+
+        String sessionId = LocalDateTime.now().toString();
+        String accessToken = tokenService.generateToken(email, user.getRole(), user.getId(), sessionId);
+
+        String refreshToken = tokenService.generateRefreshToken();
+        refreshSessionService.createLoginSession(sessionId, user.getId(),refreshToken);
+
+        loginSessionService.saveLoginSession(user.getId(), sessionId);
+
+        LoginResponse  response = new LoginResponse(accessToken, refreshToken);
+
+        return Response.<LoginResponse>builder()
+                .data(response)
+                .message("Login Successful")
+                .statusCode(HttpStatus.OK.value())
                 .build();
     }
 }

@@ -25,6 +25,9 @@ public class LoginSession {
     @Column(name = "user_id")
     private UUID userId;
 
+    @Column(name = "active_session_id")
+    private String activeSessionId;
+
     @Column(name = "logged_in")
     private Boolean loggedIn;
 
