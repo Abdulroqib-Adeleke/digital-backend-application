@@ -342,7 +342,7 @@ public class CustomerServiceImpl implements CustomerService {
         headers.setContentType(MediaType.APPLICATION_PDF);
         headers.setContentDisposition(
                 ContentDisposition.attachment()
-                        .filename("receipt-" + loggedInUser.getUser().getFirstName() + ".pdf")
+                        .filename("Transaction receipt-" + transactionId.toString() + ".pdf")
                         .build());
         headers.setContentLength(receipt.length);
 
@@ -401,7 +401,8 @@ public class CustomerServiceImpl implements CustomerService {
         headers.setContentType(MediaType.APPLICATION_PDF);
         headers.setContentDisposition(
                 ContentDisposition.attachment()
-                        .filename("Bank-statement" + customer.getFirstName() + ".pdf")
+                        .filename(customer.getFirstName() + " " + customer.getLastName() + "_" +
+                                payload.accountNumber() + "_" + LocalDateTime.now() + ".pdf")
                         .build());
         headers.setContentLength(statementPDF.length);
 
