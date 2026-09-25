@@ -1,0 +1,1 @@
+ALTER TABLE account_daily_audit RENAME COLUMN "accountId" TO account_id;

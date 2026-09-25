@@ -227,6 +227,7 @@ public class SystemAdminServiceImpl implements SystemAdminService {
                 .dateOfBirth(admin.getDateOfBirth())
                 .role(admin.getRole())
                 .address(admin.getAddress())
+                .active(admin.isActive())
                 .build();
     }
 

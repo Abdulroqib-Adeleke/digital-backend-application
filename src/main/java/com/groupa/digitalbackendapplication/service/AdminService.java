@@ -2,6 +2,7 @@ package com.groupa.digitalbackendapplication.service;
 
 import com.groupa.digitalbackendapplication.domain.dto.request.AccountSuspensionRequest;
 import com.groupa.digitalbackendapplication.domain.dto.request.AdminCreationRequest;
+import com.groupa.digitalbackendapplication.domain.dto.request.ChangePasswordRequest;
 import com.groupa.digitalbackendapplication.domain.dto.request.KycRejectionRequest;
 import com.groupa.digitalbackendapplication.domain.dto.response.*;
 import com.groupa.digitalbackendapplication.domain.entities.AuditLog;
@@ -30,4 +31,6 @@ public interface AdminService {
     ResponseWrapper<BankOverviewDto> getOverview();
     ResponseWrapper<Page<AuditLog>> getAuditLogs(int pageNumber, int pageSize);
     ResponseWrapper<Page<TransactionHistoryResponseDto>> getAllTransactions(Pageable pageable);
+    ResponseWrapper<String> changePassword(ChangePasswordRequest payload);
+    ResponseWrapper<LogoutResponse> logout();
 }

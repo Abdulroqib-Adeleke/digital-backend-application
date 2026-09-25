@@ -1,0 +1,1 @@
+ALTER TABLE transactions RENAME COLUMN "Destination_account_name" TO destination_account_name;

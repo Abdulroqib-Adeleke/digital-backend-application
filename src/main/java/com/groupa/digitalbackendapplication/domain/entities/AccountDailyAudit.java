@@ -22,7 +22,7 @@ public class AccountDailyAudit {
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "accountId")
+    @JoinColumn(name = "account_id")
     private Account account;
 
     private BigDecimal openingAmount;

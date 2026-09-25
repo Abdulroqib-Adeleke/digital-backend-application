@@ -127,6 +127,9 @@ public class AuthServiceImpl implements AuthService {
 
         AuthUser authUser = (AuthUser) customUserDetailsService.loadUserByUsername(payload.getEmail());
 
+        if(!admin.isActive())
+            throw new BadRequestException("Admin has been suspended");
+
         if (!passwordEncoder.matches(payload.getPassword(), authUser.getPassword())) {
             throw new BadRequestException("Password does not match");
         }
@@ -182,35 +185,6 @@ public class AuthServiceImpl implements AuthService {
         return response;
     }
 
-    @Override
-    public Response<LogoutResponse> logout() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-
-        AuthUser authUser = (AuthUser) authentication.getPrincipal();
-        UUID userId = authUser.getUser().getId();
-
-        loginSessionService.invalidateLoginSession(userId);
-
-        refreshSessionService.invalidateLoginSession(userId);
-
-        LogoutResponse logoutResponse = new LogoutResponse("Logout Successful");
-
-        // save audit log
-        auditLogRepository.save(
-                AuditLog.builder()
-                        .actionType(ActionType.USER_LOGOUT)
-                        .userId(userId)
-                        .userEmail(authUser.getUser().getEmail())
-                        .timeOfCreation(LocalDateTime.now())
-                        .entityType("user")
-                        .build());
-
-        return Response.<LogoutResponse>builder()
-                .message("Success")
-                .data(logoutResponse)
-                .statusCode(HttpStatus.OK.value())
-                .build();
-    }
 
     @Override
     public ResponseWrapper<String> forgetCustomerPassword(ForgetPasswordRequest payload) {

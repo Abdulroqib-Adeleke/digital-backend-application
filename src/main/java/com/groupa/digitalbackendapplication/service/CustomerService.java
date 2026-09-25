@@ -1,10 +1,7 @@
 package com.groupa.digitalbackendapplication.service;
 
 import com.groupa.digitalbackendapplication.domain.dto.request.*;
-import com.groupa.digitalbackendapplication.domain.dto.response.AccountCreatedResponse;
-import com.groupa.digitalbackendapplication.domain.dto.response.CustomerDto;
-import com.groupa.digitalbackendapplication.domain.dto.response.ResponseWrapper;
-import com.groupa.digitalbackendapplication.domain.dto.response.Response;
+import com.groupa.digitalbackendapplication.domain.dto.response.*;
 import org.springframework.http.ResponseEntity;
 
 import java.time.LocalDate;
@@ -36,4 +33,6 @@ public interface CustomerService {
     ResponseWrapper<String> generateStatementViaEmail(GenerateStatementRequest payload);
 
     ResponseEntity<byte[]> generateStatement(GenerateStatementRequest payload);
+
+    ResponseWrapper<LogoutResponse> logout();
 }
