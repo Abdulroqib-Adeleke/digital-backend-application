@@ -286,7 +286,6 @@ posi-fintech/
 
 - **`User`** — base identity (auth credentials, role) subtyped by `Customer` / `Admin`.
 - **`Account`** — belongs to a customer or business; tracks balance, `AccountStatus` (`PENDING_VERIFICATION`, `ACTIVE`, `DORMANT`, `FROZEN`), `AccountTier`, and account type.
-- **`Business`** — business entity linked to business accounts.
 - **`Transaction`** / **`LedgerEntry`** — records fund movement; ledger entries capture debit/credit legs with `LedgerEntryStatus` (`SETTLED`, `PENDING`, `VOID`) for double-entry-style auditability.
 - **`KycEntity`** — KYC submissions with `KycStatus` (`PENDING`, `APPROVED`, `REJECTED`) and `KycDocumentType` (`NIN`, `BVN`).
 - **`OtpVerification`** — one-time passcodes for login, sent via `OtpChannel` (`EMAIL`, `SMS`).
