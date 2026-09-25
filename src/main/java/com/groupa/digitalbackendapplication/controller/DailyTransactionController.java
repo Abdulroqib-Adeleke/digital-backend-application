@@ -4,6 +4,7 @@ import com.groupa.digitalbackendapplication.domain.dto.response.DailyTransaction
 import com.groupa.digitalbackendapplication.domain.dto.response.ResponseWrapper;
 import com.groupa.digitalbackendapplication.service.impl.DailyTransactionServiceImpl;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -13,14 +14,14 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequiredArgsConstructor
-@PreAuthorize("hasAuthority('ADMIN')")
+@PreAuthorize("hasAnyAuthority('ADMIN', 'SYS_ADMIN')")
 @RequestMapping("/api/daily-transactions")
 public class DailyTransactionController {
 
     private final DailyTransactionServiceImpl dailyTransactionService;
 
+    @Operation(security = @SecurityRequirement(name = "bearerAuth"))
     @GetMapping("/daily")
-    @Operation(summary = "Get Daily Transactions summary", method = "GET")
     public ResponseEntity<ResponseWrapper<DailyTransactionResponse>> getDailyTransactionsSummary(){
         return ResponseEntity.ok(dailyTransactionService.getDailyTransactionSummary());
     }

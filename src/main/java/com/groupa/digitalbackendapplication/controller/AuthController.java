@@ -52,16 +52,10 @@ public class AuthController {
         return ResponseEntity.ok(otpService.resendOtp(request));
     }
 
-    @Operation(security =@SecurityRequirement(name = "X-ADMIN_ID"))
     @PostMapping(path = "/login-admin")
     public ResponseEntity<Response<LoginResponse>> loginAdmin(@Valid @RequestBody LoginRequest payload,
                                                               @RequestHeader("X-ADMIN_ID") String adminId){
         return ResponseEntity.ok(authService.loginAdmin(payload, adminId));
-    }
-
-    @PostMapping(path = "/logout")
-    public ResponseEntity<Response<LogoutResponse>> logoutUser(){
-        return ResponseEntity.ok(authService.logout());
     }
 
     @GetMapping("/new-access-token/{refresh-token}")

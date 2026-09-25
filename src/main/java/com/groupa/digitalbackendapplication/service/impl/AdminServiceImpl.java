@@ -2,6 +2,7 @@ package com.groupa.digitalbackendapplication.service.impl;
 
 import com.groupa.digitalbackendapplication.domain.dto.request.AccountSuspensionRequest;
 import com.groupa.digitalbackendapplication.domain.dto.request.AdminCreationRequest;
+import com.groupa.digitalbackendapplication.domain.dto.request.ChangePasswordRequest;
 import com.groupa.digitalbackendapplication.domain.dto.request.KycRejectionRequest;
 import com.groupa.digitalbackendapplication.domain.dto.response.*;
 import com.groupa.digitalbackendapplication.domain.entities.*;
@@ -511,6 +512,44 @@ public class AdminServiceImpl implements AdminService {
                 .build();
     }
 
+    @Override
+    public ResponseWrapper<String> changePassword(ChangePasswordRequest payload) {
+
+        AuthUser loggedInUser = securityUtil.getSecurityPrincipal();
+
+        Admin admin = adminRepository.findById(loggedInUser.getUser().getId())
+                .orElseThrow(()-> new ResourceNotFoundException("User not found"));
+
+        if(!payload.newPassword().equals(payload.confirmPassword()))
+            throw new BadRequestException("Confirm password must be same as new password");
+
+        admin.setPassword(passwordEncoder.encode(payload.confirmPassword()));
+        admin.setUpdatedAt(LocalDateTime.now());
+        adminRepository.save(admin);
+
+        // save audit log
+        auditLogRepository.save(
+                AuditLog.builder()
+                        .actionType(ActionType.PASSWORD_CHANGED)
+                        .userId(admin.getId())
+                        .userEmail(admin.getEmail())
+                        .timeOfCreation(LocalDateTime.now())
+                        .entityType("admin")
+                        .build());
+
+        logout();
+
+        return ResponseWrapper.<String>builder()
+                .message("Password reset successful, please login with the new password")
+                .statusCode(HttpStatus.ACCEPTED)
+                .build();
+    }
+
+    @Override
+    public ResponseWrapper<LogoutResponse> logout() {
+        return securityUtil.logout();
+    }
+
 
     private String buildAdminId(Role role){
 
@@ -587,6 +626,7 @@ public class AdminServiceImpl implements AdminService {
                 .dateOfBirth(admin.getDateOfBirth())
                 .role(admin.getRole())
                 .address(admin.getAddress())
+                .active(admin.isActive())
                 .build();
     }
 

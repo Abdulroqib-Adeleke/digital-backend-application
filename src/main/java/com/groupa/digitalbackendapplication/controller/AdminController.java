@@ -1,6 +1,7 @@
 package com.groupa.digitalbackendapplication.controller;
 
 import com.groupa.digitalbackendapplication.domain.dto.request.AccountSuspensionRequest;
+import com.groupa.digitalbackendapplication.domain.dto.request.ChangePasswordRequest;
 import com.groupa.digitalbackendapplication.domain.dto.request.KycRejectionRequest;
 import com.groupa.digitalbackendapplication.domain.dto.response.*;
 import com.groupa.digitalbackendapplication.domain.entities.AuditLog;
@@ -13,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -122,5 +124,17 @@ public class AdminController {
         Pageable pageable = PageRequest.of(page, size);
 
         return adminService.getAllTransactions(pageable);
+    }
+
+    @Operation(security = @SecurityRequirement(name = "bearerAuth"))
+    @PatchMapping("/password-reset")
+    public ResponseWrapper<String> changeAdminPassword(ChangePasswordRequest payload){
+        return adminService.changePassword(payload);
+    }
+
+    @Operation(security = @SecurityRequirement(name = "bearerAuth"))
+    @PostMapping(path = "/logout")
+    public ResponseEntity<ResponseWrapper<LogoutResponse>> logoutUser(){
+        return ResponseEntity.ok(adminService.logout());
     }
 }

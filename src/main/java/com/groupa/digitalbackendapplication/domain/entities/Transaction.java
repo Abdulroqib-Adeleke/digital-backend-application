@@ -46,7 +46,7 @@ public class Transaction {
     @Column(name = "destination_account_number")
     private String destinationAccountNumber;
 
-    @Column(name = "Destination_account_name")
+    @Column(name = "destination_account_name")
     private String destinationAccountName;
 
     @Column(name = "amount_transferred", nullable = false, precision = 19, scale = 2)

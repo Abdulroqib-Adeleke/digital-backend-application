@@ -30,4 +30,6 @@ public class AdminDto {
     private Role role;
 
     private String address;
+
+    private boolean active;
 }

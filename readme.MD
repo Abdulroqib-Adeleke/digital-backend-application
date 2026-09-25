@@ -20,10 +20,11 @@ POI-BANK is a Spring Boot backend for a digital banking / fintech platform. It s
 ## Features
 
 - **Authentication & Sessions** — JWT access/refresh tokens, OTP verification (email/SMS) on login, forgot-password flows for customers and admins, logout with session invalidation.
-- **Account Management** — Personal (Savings, Checkings, Retirement, CD) and business account creation, secondary/multiple accounts per user, tiered account limits (`TIER_1`–`TIER_3`) with daily transfer limits and max-balance enforcement, transaction PIN setup/verification.
+- **Account Management** — Personal (Savings, Checkings, Retirement, CD) and secondary/multiple accounts per user, tiered account limits (`TIER_1`–`TIER_3`) with daily transfer limits and max-balance enforcement, transaction PIN setup/verification.
 - **Transactions** — Peer transfers, transfers between a user's own accounts, card-based deposits, transaction requery (status reconciliation), full transaction history.
 - **KYC** — Customer KYC submission (NIN/BVN), admin review queue, approve/reject workflows.
 - **Admin Console** — Bank overview stats, customer/account suspension & reactivation, audit log viewing, paginated views of customers, transactions, and daily transaction summaries.
+- **System Admin** — Manages admins (Creation, suspension, and deleting)
 - **Documents & Notifications** — PDF transaction receipts and account statements (iText), statements delivered via email, transaction alert notifications.
 - **Auditing** — Append-only `AuditLog` and `AccountDailyAudit`/ledger entries for traceability of balance-affecting actions.
 
@@ -51,8 +52,8 @@ utils/        → Encryption, tiering, account, transaction utility classes
 ### Security Model
 
 - Stateless sessions (`SessionCreationPolicy.STATELESS`) with a custom `AuthFilter` validating JWTs on every request.
-- Role-based authorization via `@PreAuthorize`, with three roles: `ADMIN`, `EMPLOYEE`, `CUSTOMER`.
-- Public endpoints: `/api/auth/**`, `/api/account/create-personal-account`, `/api/business/createaccount`, and Swagger/OpenAPI docs. Everything else requires authentication.
+- Role-based authorization via `@PreAuthorize`, with three roles: `ADMIN`, `SYS_ADMIN`, `CUSTOMER`.
+- Public endpoints: `/api/auth/**`, and Swagger/OpenAPI docs. Everything else requires authentication.
 - Sensitive fields (e.g. NIN/BVN, card details) are encrypted at rest via `EncryptionUtil` (Spring Security `TextEncryptor`).
 - Passwords hashed with BCrypt.
 
@@ -73,13 +74,11 @@ All endpoints are prefixed `/api`. Full interactive documentation is available v
 ### Auth — `/api/auth`
 | Method | Endpoint | Description |
 |---|---|---|
-| POST | `/create-Admin` | Create an admin account |
 | POST | `/create-personal-account` | Register a new customer (public) |
 | POST | `/login` | Customer login (triggers OTP) |
 | POST | `/verify-otp` | Verify OTP after login |
 | POST | `/resend-otp` | Resend OTP |
 | POST | `/login-admin` | Admin login |
-| POST | `/logout` | Logout / invalidate session |
 | GET | `/new-access-token/{refresh-token}` | Refresh access token |
 | PATCH | `/forget-password/customer` | Customer password reset |
 | PATCH | `/forget-password/admin/{admin-id}` | Admin password reset |
@@ -97,11 +96,7 @@ All endpoints are prefixed `/api`. Full interactive documentation is available v
 | POST | `/get-statement-via-email` | Email an account statement |
 | GET | `/download-pdf-receipt/{transaction-id}` | Download a transaction receipt as PDF |
 | POST | `/download-statement` | Download an account statement as PDF |
-
-### Business — `/api/business`
-| Method | Endpoint | Description |
-|---|---|---|
-| POST | `/createaccount` | Register a new business account (public) |
+| POST | `/logout` | Logout / invalidate session |
 
 ### Transaction — `/api/transaction` (role: `CUSTOMER`)
 | Method | Endpoint | Description |
@@ -117,7 +112,7 @@ All endpoints are prefixed `/api`. Full interactive documentation is available v
 |---|---|---|
 | POST | `/submit` | Submit KYC documents (NIN/BVN) |
 
-### Admin — `/api/admin` (role: `ADMIN`)
+### Admin — `/api/admin` (role: `ADMIN, SYS_ADMIN`)
 | Method | Endpoint | Description |
 |---|---|---|
 | GET | `/admin-profile` | Get current admin profile |
@@ -134,6 +129,18 @@ All endpoints are prefixed `/api`. Full interactive documentation is available v
 | GET | `/stats` | Bank-wide overview statistics |
 | GET | `/get-all-audit-logs` | Paginated audit log |
 | GET | `/get-all-transactions` | Paginated list of all transactions |
+| POST | `/logout` | Logout / invalidate session |
+
+### System Admin — `/api/sys-admin` (role: `SYS_ADMIN`)
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/create-Admin` | Create an admin account |
+| GET | `/admin-overview` | admin statistics |
+| GET | `/fetch-all-admin` | fetch all admins |
+| GET | `/fetch-admin-by-id/{admin-id}` | fetch admin by admin id |
+| PATCH | `/suspend-admin` | suspend an admin |
+| PATCH | `/reactivate-admin` | unsuspend an admin |
+| DELETE | `/delete-admin` | delete an admin |
 
 ### Daily Transactions — `/api/daily-transactions` (role: `ADMIN`)
 | Method | Endpoint | Description |
@@ -218,7 +225,7 @@ The API will be available at `http://localhost:8080`.
 
 ### Database Schema / Migrations
 
-SQL migration files live in `src/main/resources/db/migration/` (Flyway-style naming: `V1__init_schema.sql`, `V2__create_daily_transactions_schema.sql`, `V3__alter_users_and_businesses_scehma.sql`). 
+SQL migration files live in `src/main/resources/db/migration/` (Flyway-style naming: `V1__create_tables.sql`, `V2__alter_table.sql`, `V3__alter_table.sql`). 
 
 ## API Documentation
 

@@ -1,10 +1,7 @@
 package com.groupa.digitalbackendapplication.controller;
 
 import com.groupa.digitalbackendapplication.domain.dto.request.*;
-import com.groupa.digitalbackendapplication.domain.dto.response.AccountCreatedResponse;
-import com.groupa.digitalbackendapplication.domain.dto.response.CustomerDto;
-import com.groupa.digitalbackendapplication.domain.dto.response.ResponseWrapper;
-import com.groupa.digitalbackendapplication.domain.dto.response.Response;
+import com.groupa.digitalbackendapplication.domain.dto.response.*;
 import com.groupa.digitalbackendapplication.service.CustomerService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -82,5 +79,11 @@ public class AccountController {
     @PostMapping("/download-statement")
     public ResponseEntity<byte[]> downloadStatement(@RequestBody @Valid GenerateStatementRequest payload){
         return customerService.generateStatement(payload);
+    }
+
+    @Operation(security = @SecurityRequirement(name = "bearerAuth"))
+    @PostMapping(path = "/logout")
+    public ResponseEntity<ResponseWrapper<LogoutResponse>> logoutUser(){
+        return ResponseEntity.ok(customerService.logout());
     }
 }

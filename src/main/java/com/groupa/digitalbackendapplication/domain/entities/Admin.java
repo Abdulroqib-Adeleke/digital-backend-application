@@ -18,7 +18,7 @@ import lombok.experimental.SuperBuilder;
 @PrimaryKeyJoinColumn(name = "user_id")
 public class Admin extends User{
 
-    @Column(name = "adminId", nullable = false)
+    @Column(name = "admin_id", nullable = false)
     private String adminId;
 
     @Column(name = "address", nullable = false)

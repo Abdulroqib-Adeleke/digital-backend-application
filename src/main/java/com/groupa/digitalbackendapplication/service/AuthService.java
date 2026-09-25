@@ -16,7 +16,6 @@ public interface AuthService {
     Response<LoginResponse> loginUser(LoginRequest loginRequest);
     Response<LoginResponse> loginAdmin(LoginRequest payload, String adminId);
     Response<LoginResponse> getNewAccessToken(String refreshToken);
-    Response<LogoutResponse> logout();
     ResponseWrapper<String> forgetCustomerPassword(ForgetPasswordRequest payload);
     ResponseWrapper<String> forgetAdminPassword(ForgetPasswordRequest payload, String adminId);
 

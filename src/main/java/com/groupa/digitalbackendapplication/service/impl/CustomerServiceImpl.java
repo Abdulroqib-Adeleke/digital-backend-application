@@ -412,6 +412,11 @@ public class CustomerServiceImpl implements CustomerService {
         return new ResponseEntity<>(statementPDF, headers, HttpStatus.CREATED);
     }
 
+    @Override
+    public ResponseWrapper<LogoutResponse> logout() {
+        return securityUtil.logout();
+    }
+
     private SavedCustomerResponse buildCustomerDetails(String firstName, String lastName, String email, String password, String phoneNumber, Role role, Gender gender, LocalDate dateOfBirth, String address){
 
         Customer customer =Customer.builder()
@@ -459,28 +464,7 @@ public class CustomerServiceImpl implements CustomerService {
         return customerOptional.isPresent();
     }
 
-    private void logout(){
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
-        AuthUser authUser = (AuthUser) authentication.getPrincipal();
-        UUID userId = authUser.getUser().getId();
-
-        loginSessionService.invalidateLoginSession(userId);
-
-        refreshSessionService.invalidateLoginSession(userId);
-
-        LogoutResponse logoutResponse = new LogoutResponse("Logout Successful");
-
-        // save audit log
-        auditLogRepository.save(
-                AuditLog.builder()
-                        .actionType(ActionType.USER_LOGOUT)
-                        .userId(userId)
-                        .userEmail(authUser.getUser().getEmail())
-                        .timeOfCreation(LocalDateTime.now())
-                        .entityType("user")
-                        .build());
-    }
 
     private AccountDto buildAccountDto(Account account){
 
