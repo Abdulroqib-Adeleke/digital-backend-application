@@ -16,7 +16,7 @@ import java.time.format.DateTimeFormatter;
 @Service
 public class StatementPdfService {
 
-    private static final String FOOTER_NOTE = "POI Bank is a registered financial institution."; // your regulatory wording
+    private static final String FOOTER_NOTE = "POI Bank is a registered financial institution.";
     private static final DateTimeFormatter D = DateTimeFormatter.ofPattern("MMM dd, yyyy");
     private static final Font CAP = PdfStyles.font(7, Font.BOLD, PdfStyles.SLATE_400);
     private static final Font VAL = PdfStyles.font(9, Font.BOLD, PdfStyles.SLATE_800);

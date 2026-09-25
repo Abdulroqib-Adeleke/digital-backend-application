@@ -7,6 +7,7 @@ import lombok.Data;
 @Builder
 public class BankOverviewDto {
 
+    private long totalCustomers;
     private long totalAccount;
     private long totalActiveAccount;
     private long totalDormantAccount;

@@ -26,8 +26,8 @@ final class PdfStyles {
     static final BaseColor ORANGE_50 = new BaseColor(255, 251, 235), ORANGE_100 = new BaseColor(217, 119, 6);
 
     private static final String[] FONT_PATHS = {
-            "/fonts/NotoSans-Regular.ttf",                          // file you add to src/main/resources/fonts
-            "/net/sf/jasperreports/fonts/dejavu/DejaVuSans.ttf"     // from the jasperreports-fonts dependency
+            "/fonts/NotoSans-Regular.ttf",
+            "/net/sf/jasperreports/fonts/dejavu/DejaVuSans.ttf"
     };
 
     private static final BaseFont BASE;
@@ -52,7 +52,7 @@ final class PdfStyles {
             } catch (Exception e) {
                 throw new IllegalStateException("Cannot load any PDF font", e);
             }
-            CURRENCY = "NGN";   // Helvetica has no naira glyph
+            CURRENCY = "NGN";
         } else {
             CURRENCY = "₦";
         }
@@ -85,7 +85,6 @@ final class PdfStyles {
         return c;
     }
 
-    /** Cell with only a bottom rule, used for table rows. */
     static PdfPCell ruled(Phrase p, int align, BaseColor line, float width) {
         PdfPCell c = plain(p, align);
         c.setBorder(Rectangle.BOTTOM);
@@ -96,7 +95,6 @@ final class PdfStyles {
         return c;
     }
 
-    /** Two-line phrase: a main line and a smaller line under it. */
     static Phrase two(String top, Font f1, String bottom, Font f2) {
         Phrase p = new Phrase();
         p.add(new Chunk(nz(top), f1));

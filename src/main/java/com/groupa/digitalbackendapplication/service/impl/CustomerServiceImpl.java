@@ -342,7 +342,7 @@ public class CustomerServiceImpl implements CustomerService {
         headers.setContentType(MediaType.APPLICATION_PDF);
         headers.setContentDisposition(
                 ContentDisposition.attachment()
-                        .filename("receipt-" + loggedInUser.getUser().getFirstName() + ".pdf")
+                        .filename("Transaction receipt-" + transactionId.toString() + ".pdf")
                         .build());
         headers.setContentLength(receipt.length);
 
@@ -362,13 +362,16 @@ public class CustomerServiceImpl implements CustomerService {
 
         byte[] statementPDF = generateStatementPDF(customer, payload);
 
+        String statementName = customer.getFirstName()
+                + "_" + payload.accountNumber() + "_"+ LocalDateTime.now()+".pdf";
+
         EmailDetails emailDetails = EmailDetails.builder()
                 .subject("Bank Statement")
                 .recipient(customer.getEmail())
                 .messageBody("Find an attachment of your bank statement")
                 .build();
 
-        emailService.sendEmail(emailDetails, statementPDF);
+        emailService.sendEmail(emailDetails, statementPDF, statementName);
 
         auditLogRepository.save(
                 AuditLog.builder()
@@ -401,7 +404,8 @@ public class CustomerServiceImpl implements CustomerService {
         headers.setContentType(MediaType.APPLICATION_PDF);
         headers.setContentDisposition(
                 ContentDisposition.attachment()
-                        .filename("Bank-statement" + customer.getFirstName() + ".pdf")
+                        .filename(customer.getFirstName() + " " + customer.getLastName() + "_" +
+                                payload.accountNumber() + "_" + LocalDateTime.now() + ".pdf")
                         .build());
         headers.setContentLength(statementPDF.length);
 
@@ -615,11 +619,13 @@ public class CustomerServiceImpl implements CustomerService {
         Optional<AccountDailyAudit> closingOptional = accountDailyAuditRepository
                 .findFirstByAccountIdAndDateLessThanEqualOrderByDateDesc(userAccount.getId(), payload.to());
 
-        if(openingOptional.isEmpty() && closingOptional.isEmpty())
-            throw new BadRequestException("Could not find transactions for statement generation");
+        AccountDailyAudit opening = openingOptional
+                .orElseThrow(() -> new BadRequestException(
+                        "No opening balance found on or after " + payload.from()));
 
-        AccountDailyAudit opening =  openingOptional.get();
-        AccountDailyAudit closing =  closingOptional.get();
+        AccountDailyAudit closing = closingOptional
+                .orElseThrow(() -> new BadRequestException(
+                        "No closing balance found on or before " + payload.to()));
 
         LocalDateTime start = payload.from().atStartOfDay();
 

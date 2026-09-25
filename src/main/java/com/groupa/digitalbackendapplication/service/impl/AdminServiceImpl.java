@@ -29,6 +29,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Period;
@@ -456,8 +457,11 @@ public class AdminServiceImpl implements AdminService {
 
         List<TransactionHistoryResponseDto> transactionList = allTransaction.stream()
                 .map(transaction -> {
-                    return new TransactionHistoryResponseDto(transaction.getId(), transaction.getTransactionType(), transaction.getTransactionStatus(),
-                            transaction.getSourceAccount().getAccountNumber(), transaction.getAccountName(), transaction.getDestinationAccountNumber(), transaction.getDestinationAccountName(), transaction.getAmountTransferred(),
+                    return new TransactionHistoryResponseDto(transaction.getId(), transaction.getTransactionType(),
+                            transaction.getTransactionStatus(),
+                            transaction.getSourceAccount() != null ? transaction.getSourceAccount().getAccountNumber() : null, transaction.getAccountName(),
+                            transaction.getDestinationAccountNumber(), transaction.getDestinationAccountName(),
+                            transaction.getAmountTransferred(),
                             transaction.getDescription(), transaction.getCreatedAt());
                 })
                 .toList();
@@ -612,9 +616,11 @@ public class AdminServiceImpl implements AdminService {
     }
 
     private BankOverviewDto buildOverview(){
+        long totalCustomer = customerRepository.count();
         long totalAccount = accountRepository.count();
 
         return BankOverviewDto.builder()
+                .totalCustomers(totalCustomer)
                 .totalAccount(totalAccount)
                 .totalActiveAccount(totalAccountByStatus(AccountStatus.ACTIVE))
                 .totalDormantAccount(totalAccountByStatus(AccountStatus.DORMANT))
