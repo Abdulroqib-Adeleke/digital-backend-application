@@ -24,5 +24,8 @@ public class Admin extends User{
     @Column(name = "address", nullable = false)
     private String address;
 
+    @Column(name = "is_admin_active")
+    private boolean active;
+
 
 }

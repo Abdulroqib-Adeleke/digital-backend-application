@@ -12,7 +12,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 public interface AuthService {
-    ResponseWrapper<AdminCreationResponse> createAdmin(AdminCreationRequest payload);
+    ResponseWrapper<AdminCreationResponse> createSystemAdmin(AdminCreationRequest payload);
     Response<LoginResponse> loginUser(LoginRequest loginRequest);
     Response<LoginResponse> loginAdmin(LoginRequest payload, String adminId);
     Response<LoginResponse> getNewAccessToken(String refreshToken);

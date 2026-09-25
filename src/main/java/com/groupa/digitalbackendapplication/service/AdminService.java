@@ -14,6 +14,7 @@ import java.util.UUID;
 
 public interface AdminService {
 
+    ResponseWrapper<AdminCreationResponse> createSYSAdmin(AdminCreationRequest payload);
     ResponseWrapper<AdminCreationResponse> createAdmin(AdminCreationRequest payload);
     ResponseWrapper<AdminDto> getAdminProfile();
     Response<CustomerDto> getCustomerProfile(String accountNumber);

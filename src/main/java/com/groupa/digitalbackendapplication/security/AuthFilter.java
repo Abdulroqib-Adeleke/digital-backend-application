@@ -95,10 +95,7 @@ public class AuthFilter extends OncePerRequestFilter {
             return;
         } catch (Exception e) {
             log.error("Exception occurred while processing token: {}", e.getMessage());
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            response.setContentType("application/json");
-            response.getWriter().write("{\"message\":\"Authentication failed. Please log in again.\",\"statusCode\":401}");
-            return;
+            formatResponse(response,"Something went wrong",HttpStatus.INTERNAL_SERVER_ERROR,HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
         }
     }
 

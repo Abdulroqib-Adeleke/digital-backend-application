@@ -30,10 +30,6 @@ public class AuthController {
     private final CustomerService customerService;
     private final OtpService otpService;
 
-    @PostMapping("/create-Admin")
-    public ResponseWrapper<AdminCreationResponse> createAdmin(@Valid @RequestBody AdminCreationRequest payload){
-        return authService.createAdmin(payload);
-    }
 
     @PostMapping("/create-personal-account")
     public ResponseWrapper<AccountCreatedResponse> createPersonalAccount(@RequestBody @Valid CustomerRegistrationRequest payload){

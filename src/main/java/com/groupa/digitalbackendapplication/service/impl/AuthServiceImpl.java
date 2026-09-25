@@ -65,8 +65,8 @@ public class AuthServiceImpl implements AuthService {
     private final AuditLogRepository auditLogRepository;
 
     @Override
-    public ResponseWrapper<AdminCreationResponse> createAdmin(AdminCreationRequest payload) {
-        return adminService.createAdmin(payload);
+    public ResponseWrapper<AdminCreationResponse> createSystemAdmin(AdminCreationRequest payload) {
+        return adminService.createSYSAdmin(payload);
     }
 
     @Override
