@@ -56,6 +56,40 @@ public class AdminServiceImpl implements AdminService {
 
 
     @Override
+    public ResponseWrapper<AdminCreationResponse> createSYSAdmin(AdminCreationRequest payload) {
+        Role role = Role.SYS_ADMIN;
+
+        if(validatePhoneNumber(payload.phoneNumber()))
+            throw new BadRequestException("Error occurred, provide another phone");
+
+        if(checkEmail(payload.email()))
+            throw new BadRequestException("Error occurred, provide another email");
+
+        if(validateAge(payload.dateOfBirth()))
+            throw new BadRequestException("Admin can not be less than 18 years of age");
+
+        String adminId = buildAdminId(role);
+
+        AdminCreationResponse response = buildUser(payload.firstName(), payload.lastName(), payload.email(),
+                payload.password(), payload.phoneNumber(), role, payload.gender(), payload.dateOfBirth(),
+                payload.address(), adminId);
+
+        try {
+            String emailSubject = "Admin account Creation";
+            String emailBody = "Dear " + payload.firstName() + " " + payload.lastName().toUpperCase(Locale.ROOT) + ", your admin account has successfully been created. Your Admin ID: " + response.getAdminId();
+            sendMail(payload.email(), emailSubject, emailBody);
+        } catch (Exception e){
+            log.error("Welcome email failed to send to {}: {}", payload.email(), e.getMessage());
+        }
+
+        return ResponseWrapper.<AdminCreationResponse>builder()
+                .data(response)
+                .message("Admin creation successful")
+                .statusCode(HttpStatus.CREATED)
+                .build();
+    }
+
+    @Override
     public ResponseWrapper<AdminCreationResponse> createAdmin(AdminCreationRequest payload) {
         Role role = Role.ADMIN;
 
@@ -68,9 +102,11 @@ public class AdminServiceImpl implements AdminService {
         if(validateAge(payload.dateOfBirth()))
             throw new BadRequestException("Admin can not be less than 18 years of age");
 
+        String adminId = buildAdminId(role);
+
         AdminCreationResponse response = buildUser(payload.firstName(), payload.lastName(), payload.email(),
                 payload.password(), payload.phoneNumber(), role, payload.gender(), payload.dateOfBirth(),
-                payload.address());
+                payload.address(), adminId);
 
         try {
             String emailSubject = "Admin account Creation";
@@ -476,11 +512,13 @@ public class AdminServiceImpl implements AdminService {
     }
 
 
-    private String buildAdminId(){
-        String id = "AD0001";
-        Optional<Admin> lastAdmin = adminRepository.findTopByOrderByAdminIdDesc();
+    private String buildAdminId(Role role){
 
-        if (lastAdmin.isPresent()){
+        String adminId = "AD0001";
+        String sysAdminId = "SA0001";
+        Optional<Admin> lastAdmin = adminRepository.findTopByRoleOrderByAdminIdDesc(role);
+
+        if (lastAdmin.isPresent() && lastAdmin.get().getRole() == Role.ADMIN){
             String lastAdminId = lastAdmin.get().getAdminId();
 
             String prefix = lastAdminId.substring(0, 2);
@@ -488,14 +526,31 @@ public class AdminServiceImpl implements AdminService {
 
             number++;
 
-            id = prefix + String.format("%04d", number);
+            adminId = prefix + String.format("%04d", number);
+            return adminId;
+        }else if(lastAdmin.isEmpty() && role.equals(Role.ADMIN))
+            return adminId;
+
+        if(lastAdmin.isPresent() && lastAdmin.get().getRole() == Role.SYS_ADMIN){
+            String lastAdminId = lastAdmin.get().getAdminId();
+
+            String prefix = lastAdminId.substring(0, 2);
+            int number = Integer.parseInt(lastAdminId.substring(2));
+
+            number++;
+
+            sysAdminId = prefix + String.format("%04d", number);
+            return sysAdminId;
+        } else if (lastAdmin.isEmpty() && role.equals(Role.SYS_ADMIN)) {
+            return sysAdminId;
         }
-        return  id;
+
+        return adminId;
     }
 
     private AdminCreationResponse buildUser(String firstName, String lastName, String email, String password,
-                                            String phoneNumber, Role role, Gender gender, LocalDate dateOfBirth, String address){
-        String adminId = buildAdminId();
+                                            String phoneNumber, Role role, Gender gender, LocalDate dateOfBirth, String address, String adminId){
+
         Admin admin = Admin.builder().firstName(firstName)
                 .lastName(lastName)
                 .email(email)
@@ -506,6 +561,7 @@ public class AdminServiceImpl implements AdminService {
                 .dateOfBirth(dateOfBirth)
                 .adminId(adminId)
                 .address(address)
+                .active(true)
                 .build();
         Admin savedAdmin = adminRepository.save(admin);
         // save audit log
