@@ -27,61 +27,72 @@ import java.util.Map;
 
 public class EmailServiceImpl implements EmailService {
 
-    private final JavaMailSender javaMailSender;
+    private final RestClient restClient;
+    private final String senderEmail;
 
-    @Value("${spring.mail.username}")
-    private String senderEmail;
-
-    public EmailServiceImpl(JavaMailSender javaMailSender) {
-        this.javaMailSender = javaMailSender;
+    public EmailServiceImpl(@Value("${resend.api.key}") String apiKey,
+                            @Value("${resend.sender.email}") String senderEmail) {
+        this.senderEmail = senderEmail;
+        this.restClient = RestClient.builder()
+                .baseUrl("https://api.resend.com")
+                .defaultHeader("Authorization", "Bearer " + apiKey)
+                .defaultHeader("Content-Type", "application/json")
+                .build();
     }
 
     @Override
     public void sendEmail(EmailDetails emailDetails) {
-        try{
-            SimpleMailMessage mailMessage = new SimpleMailMessage();
-            mailMessage.setFrom(senderEmail);
-            mailMessage.setTo(emailDetails.getRecipient());
-            mailMessage.setSubject(emailDetails.getSubject());
-            mailMessage.setText(emailDetails.getMessageBody());
+        Map<String, Object> body = Map.of(
+                "from", senderEmail,
+                "to", List.of(emailDetails.getRecipient()),
+                "subject", emailDetails.getSubject(),
+                "html", emailDetails.getMessageBody()
+        );
 
-            javaMailSender.send(mailMessage);
+        try {
+            restClient.post()
+                    .uri("/emails")
+                    .body(body)
+                    .retrieve()
+                    .toBodilessEntity();
+
             log.info("Email sent successfully to {}", emailDetails.getRecipient());
 
-        } catch (MailException e) {
-            log.error("Failed to send email to {}: {}", emailDetails.getRecipient(), e.getMessage());
+        } catch (RestClientResponseException e) {
+            log.error("Failed to send email to {}: {} - {}",
+                    emailDetails.getRecipient(), e.getStatusCode(), e.getResponseBodyAsString());
             throw new RuntimeException("Email sending failed", e);
         }
-
-
     }
 
     @Override
     public void sendEmail(EmailDetails emailDetails, byte[] file, String fileName) {
         Map<String, Object> body = new HashMap<>();
-        body.put("sender", Map.of("name", "POI-BANK", "email", senderEmail));
-        body.put("to", List.of(Map.of("email", emailDetails.getRecipient())));
+        body.put("from", senderEmail);
+        body.put("to", List.of(emailDetails.getRecipient()));
         body.put("subject", emailDetails.getSubject());
-        body.put("htmlContent", emailDetails.getMessageBody());
+        body.put("html", emailDetails.getMessageBody());
 
+        if (file != null && file.length > 0) {
+            String base64Content = Base64.getEncoder().encodeToString(file);
+            body.put("attachments", List.of(Map.of(
+                    "filename", fileName,
+                    "content", base64Content
+            )));
+        }
 
         try {
-            MimeMessage mimeMessage = javaMailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true);
+            restClient.post()
+                    .uri("/emails")
+                    .body(body)
+                    .retrieve()
+                    .toBodilessEntity();
 
-            helper.setFrom(senderEmail);
-            helper.setTo(emailDetails.getRecipient());
-            helper.setSubject(emailDetails.getSubject());
-            helper.setText(emailDetails.getMessageBody());
-
-            if (file != null && file.length > 0) {
-                helper.addAttachment(fileName, new ByteArrayResource(file));
-            }
-            javaMailSender.send(mimeMessage);
             log.info("Email sent successfully to {}", emailDetails.getRecipient());
 
-        } catch (MessagingException e) {
-            log.error("Failed to send email to {}: {}", emailDetails.getRecipient(), e.getMessage());
+        } catch (RestClientResponseException e) {
+            log.error("Failed to send email to {}: {} - {}",
+                    emailDetails.getRecipient(), e.getStatusCode(), e.getResponseBodyAsString());
             throw new RuntimeException("Email sending failed", e);
         }
     }

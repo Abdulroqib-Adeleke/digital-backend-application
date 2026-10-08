@@ -21,9 +21,8 @@ class DigitalBackendApplicationTests {
 		registry.add("spring.datasource.username", postgres::getUsername);
 		registry.add("spring.datasource.password", postgres::getPassword);
 		registry.add("JWT_SECRET", () -> "test-secret-at-least-32-characters-long");
-		registry.add("MAIL_USERNAME", () -> "test@example.com");
-		registry.add("MAIL_FROM", () -> "test@example.com");
-		registry.add("MAIL_PASSWORD", () -> "test-password");
+		registry.add("RESEND_SENDER_EMAIL", () -> "test@example.com");
+		registry.add("RESEND_API_KEY", () -> "test-api-key");
 		registry.add("JWT_EXPIRATION_TIME", () -> "360000");
 		registry.add("JWT_REFRESH_EXPIRATION_TIME", () -> "3600000");
 		registry.add("ENCRYPTION_SALT", ()-> "191d497a3084231f5c2c50413b25c1ed");
