@@ -154,7 +154,7 @@ All endpoints are prefixed `/api`. Full interactive documentation is available v
 - Java 21 (JDK)
 - Maven (or use the included `./mvnw` wrapper)
 - PostgreSQL 16 (or Docker, see below)
-- A Brevo (Sendinblue) account/API key for email delivery (optional but required for OTP/statement emails)
+- A Resend account/API key for email delivery (optional but required for OTP/statement emails)
 
 ### Environment Variables
 
@@ -170,8 +170,8 @@ The application is configured entirely through environment variables (see `src/m
 | `JWT_REFRESH_EXPIRATION_TIME` | Refresh token expiry (day) |
 | `ENCRYPTION_PASSWORD` | Password for field-level encryption (`EncryptionUtil`) |
 | `ENCRYPTION_SALT` | Salt for field-level encryption |
-| `BREVO_API_KEY` | API key for the Brevo email service |
-| `BREVO_SENDER_EMAIL` | Sender email address for outbound mail |
+| `RESEND_API_KEY` | API key for the Brevo email service |
+| `RESEND_SENDER_EMAIL` | Sender email address for outbound mail |
 
 For local Docker Compose (Postgres + pgAdmin), also set:
 
