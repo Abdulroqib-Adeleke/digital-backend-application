@@ -84,7 +84,7 @@ public class CustomerServiceImpl implements CustomerService {
         //Continue account creation
         Account account = buildAccount(userResponse.getCustomer(), accountStatus, accountNumber, accountTier, accountType);
         AccountCreatedResponse createAccount = new AccountCreatedResponse(account.getAccountNumber());
-        otpService.generateAndSendOtp(userResponse.getCustomer().getId(), account);
+        otpService.generateAndSendOtp(payload.getEmail());
 
         // save audit log entry
         auditLogRepository.save(

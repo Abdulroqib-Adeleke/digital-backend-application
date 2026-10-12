@@ -89,6 +89,9 @@ public class TransactionServiceImpl implements TransactionService {
         if (payload.amount().compareTo(sourceAccount.getBalance()) > 0)
             throw new BadRequestException("Insufficient funds in account");
 
+        if(customer.getTransactionCode() == null)
+            throw new BadRequestException("You have not set a transaction pin. Kindly set one to proceed");
+
         if(!passwordEncoder.matches(String.valueOf(payload.transactionPin()), customer.getTransactionCode()))
             throw new BadCredentialsException("Wrong transaction pin");
 
@@ -131,8 +134,8 @@ public class TransactionServiceImpl implements TransactionService {
         transactionRepository.save(receiverTransaction);
 
         //Send Transaction notification
-        transactionAlertService.sendDebitAlert(sourceAccount, payload.amount(), now);
-        transactionAlertService.sendCreditAlert(sourceAccount, payload.amount(), now);
+        transactionAlertService.sendDebitAlert(sourceAccount, destinationAccount, payload.amount(), now);
+        transactionAlertService.sendCreditAlert(destinationAccount, sourceAccount, payload.amount(), now);
 
         //Update daily transactions table
         DailyTransactions dailyTransactions = fetchDailyTransactionEntity();
@@ -223,8 +226,8 @@ public class TransactionServiceImpl implements TransactionService {
         transactionRepository.save(receiverTransaction);
 
         //Send Transaction notification
-        transactionAlertService.sendDebitAlert(sourceAccount, payload.amount(), now);
-        transactionAlertService.sendCreditAlert(sourceAccount, payload.amount(), now);
+        transactionAlertService.sendDebitAlert(sourceAccount, destinationAccount, payload.amount(), now);
+        transactionAlertService.sendCreditAlert(destinationAccount, sourceAccount, payload.amount(), now);
 
         //Update daily transactions table
         DailyTransactions dailyTransactions = fetchDailyTransactionEntity();
@@ -283,7 +286,7 @@ public class TransactionServiceImpl implements TransactionService {
             Transaction savedTransaction = depositService.buildSuccessfulDeposit(destinationAccount, payload);
 
             //Send Credit Alert
-            transactionAlertService.sendCreditAlert(destinationAccount, payload.depositAmount(), LocalDateTime.now());
+            transactionAlertService.sendCreaditAlertForDeposit(destinationAccount, payload.depositAmount(), LocalDateTime.now());
 
             //Update daily transactions table
             DailyTransactions dailyTransactions = fetchDailyTransactionEntity();
@@ -346,7 +349,11 @@ public class TransactionServiceImpl implements TransactionService {
             Account account = transaction.getDestinationAccount();
             account.setBalance(account.getBalance().add(transaction.getAmountTransferred()));
 
-            transactionAlertService.sendCreditAlert(account, transaction.getAmountTransferred(), updatedLedgerTime);
+            if(transaction.getTransactionType() == TransactionType.DEPOSIT)
+                transactionAlertService.sendCreaditAlertForDeposit(account, transaction.getAmountTransferred(), updatedLedgerTime);
+            else if(transaction.getTransactionType() == TransactionType.TRANSFER)
+                transactionAlertService.sendCreditAlert(account, transaction.getSourceAccount(), transaction.getAmountTransferred(), updatedLedgerTime);
+
 
             //Update daily transactions table
             DailyTransactions dailyTransactions = fetchDailyTransactionEntity();

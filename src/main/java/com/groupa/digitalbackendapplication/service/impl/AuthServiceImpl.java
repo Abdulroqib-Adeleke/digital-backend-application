@@ -2,6 +2,7 @@ package com.groupa.digitalbackendapplication.service.impl;
 
 import com.groupa.digitalbackendapplication.domain.dto.request.AdminCreationRequest;
 import com.groupa.digitalbackendapplication.domain.dto.request.ForgetPasswordRequest;
+import com.groupa.digitalbackendapplication.domain.dto.request.VerifyOtpRequest;
 import com.groupa.digitalbackendapplication.domain.dto.response.AdminCreationResponse;
 import com.groupa.digitalbackendapplication.domain.dto.response.ResponseWrapper;
 import com.groupa.digitalbackendapplication.domain.entities.*;
@@ -24,10 +25,7 @@ import com.groupa.digitalbackendapplication.repository.CustomerRepository;
 import com.groupa.digitalbackendapplication.security.AuthUser;
 import com.groupa.digitalbackendapplication.security.CustomUserDetailsService;
 import com.groupa.digitalbackendapplication.security.TokenService;
-import com.groupa.digitalbackendapplication.service.AdminService;
-import com.groupa.digitalbackendapplication.service.AuthService;
-import com.groupa.digitalbackendapplication.service.LoginSessionService;
-import com.groupa.digitalbackendapplication.service.RefreshSessionService;
+import com.groupa.digitalbackendapplication.service.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -61,7 +59,7 @@ public class AuthServiceImpl implements AuthService {
     private final AdminService adminService;
     private final EmailService emailService;
     private final AccountRepository accountRepository;
-
+    private final OtpService otpService;
     private final AuditLogRepository auditLogRepository;
 
     @Override
@@ -134,6 +132,12 @@ public class AuthServiceImpl implements AuthService {
             throw new BadRequestException("Password does not match");
         }
 
+        String password = authUser.getUser().getFirstName().toLowerCase() + "@" + authUser.getUser().getLastName().toLowerCase() + "123";
+
+        if(passwordEncoder.matches(payload.getPassword(), passwordEncoder.encode(password)) && auditLogRepository.findByUserIdAndActionTypeAndUserEmail(admin.getId(), ActionType.ADMIN_LOGIN, admin.getEmail()).isPresent()){
+            throw new BadRequestException("Please change your default password before logging in");
+        }
+
         Response<LoginResponse> response = getLoginResponse(payload, authUser.getUser());
 
 
@@ -156,7 +160,7 @@ public class AuthServiceImpl implements AuthService {
         // save audit log
         auditLogRepository.save(
                 AuditLog.builder()
-                        .actionType(ActionType.ADMIN_REGISTRATION)
+                        .actionType(ActionType.ADMIN_LOGIN)
                         .userId(authUser.getUser().getId())
                         .userEmail(admin.getEmail())
                         .timeOfCreation(LocalDateTime.now())
@@ -194,9 +198,17 @@ public class AuthServiceImpl implements AuthService {
         if(!payload.newPassword().equals(payload.confirmPassword()))
             throw new BadRequestException("Confirm password must be same as new password");
 
+        otpService.verifyOtp(new VerifyOtpRequest(payload.email(), payload.verificationType(), payload.otp()));
+
         customer.setPassword(passwordEncoder.encode(payload.confirmPassword()));
         customer.setUpdatedAt(LocalDateTime.now());
         customerRepository.save(customer);
+
+        try {
+            sendEmail(customer.getFirstName(), customer.getEmail(), "Password Reset", "Your password has been reset successfully.");
+        } catch (Exception e) {
+            log.error("Failed to send password reset email: {}", e.getMessage());
+        }
 
         // save audit log
         auditLogRepository.save(
@@ -222,9 +234,17 @@ public class AuthServiceImpl implements AuthService {
         if(!payload.newPassword().equals(payload.confirmPassword()))
             throw new BadRequestException("Confirm password must be same as new password");
 
+        otpService.verifyOtp(new VerifyOtpRequest(payload.email(), payload.verificationType(), payload.otp()));
+
         admin.setPassword(passwordEncoder.encode(payload.confirmPassword()));
         admin.setUpdatedAt(LocalDateTime.now());
         adminRepository.save(admin);
+
+        try {
+            sendEmail(admin.getFirstName(), admin.getEmail(), "Password Reset", "Your password has been reset successfully.");
+        } catch (Exception e) {
+            log.error("Failed to send password reset email: {}", e.getMessage());
+        }
 
         // save audit log
         auditLogRepository.save(
@@ -271,5 +291,14 @@ public class AuthServiceImpl implements AuthService {
                 .message("Login Successful")
                 .statusCode(HttpStatus.OK.value())
                 .build();
+    }
+
+    private void sendEmail(String firstname, String email, String subject, String message) {
+        EmailDetails emailDetails = EmailDetails.builder()
+                .recipient(email)
+                .subject(subject)
+                .messageBody(message)
+                .build();
+        emailService.sendEmail(emailDetails);
     }
 }
