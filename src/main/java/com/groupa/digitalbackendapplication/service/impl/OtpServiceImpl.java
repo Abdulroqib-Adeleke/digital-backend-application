@@ -2,13 +2,16 @@ package com.groupa.digitalbackendapplication.service.impl;
 
 import com.groupa.digitalbackendapplication.domain.dto.request.ResendOtpRequest;
 import com.groupa.digitalbackendapplication.domain.dto.request.VerifyOtpRequest;
+import com.groupa.digitalbackendapplication.domain.dto.response.ResponseWrapper;
 import com.groupa.digitalbackendapplication.domain.entities.Account;
 import com.groupa.digitalbackendapplication.domain.entities.Customer;
 import com.groupa.digitalbackendapplication.domain.entities.OtpVerification;
+import com.groupa.digitalbackendapplication.domain.entities.User;
 import com.groupa.digitalbackendapplication.domain.enums.AccountStatus;
 import com.groupa.digitalbackendapplication.domain.enums.AccountTier;
 import com.groupa.digitalbackendapplication.domain.enums.OtpChannel;
 import com.groupa.digitalbackendapplication.domain.dto.response.Response;
+import com.groupa.digitalbackendapplication.domain.enums.VerificationType;
 import com.groupa.digitalbackendapplication.exceptions.BadRequestException;
 import com.groupa.digitalbackendapplication.exceptions.ResourceNotFoundException;
 import com.groupa.digitalbackendapplication.notification.EmailDetails;
@@ -17,6 +20,7 @@ import com.groupa.digitalbackendapplication.notification.OtpDeliveryService;
 import com.groupa.digitalbackendapplication.repository.AccountRepository;
 import com.groupa.digitalbackendapplication.repository.CustomerRepository;
 import com.groupa.digitalbackendapplication.repository.OtpVerificationRepository;
+import com.groupa.digitalbackendapplication.repository.UserRepository;
 import com.groupa.digitalbackendapplication.service.OtpService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -40,6 +44,7 @@ public class OtpServiceImpl implements OtpService {
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
     private final OtpDeliveryService otpDeliveryService;
+    private final UserRepository userRepository;
 
     private final SecureRandom secureRandom = new SecureRandom();
 
@@ -48,16 +53,13 @@ public class OtpServiceImpl implements OtpService {
 
     @Override
     @Transactional
-    public Response<String> generateAndSendOtp(UUID customerId, Account account) {
+    public Response<String> generateAndSendOtp(String email) {
 
-        Customer customer = customerRepository.findById(customerId)
-                .orElseThrow(() -> new ResourceNotFoundException("Customer not found"));
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        UUID userId = user.getId();
 
-        if (account.getAccountStatus() == AccountStatus.ACTIVE) {
-            throw new BadRequestException("Account is already active.");
-        }
-
-        otpVerificationRepository.findLatestByCustomerId(customerId).ifPresent(previousOtp -> {
+        otpVerificationRepository.findLatestByUserId(userId).ifPresent(previousOtp -> {
             previousOtp.setVerifiedAt(LocalDateTime.now());
             otpVerificationRepository.save(previousOtp);
         });
@@ -65,15 +67,15 @@ public class OtpServiceImpl implements OtpService {
         String otp = generateOtp();
         String otpHash = passwordEncoder.encode(otp);
         OtpChannel channel = otpDeliveryService.sendOtp(
-                customer.getFirstName(),
-                customer.getPhoneNumber(),
-                customer.getEmail(),
+                user.getFirstName(),
+                user.getPhoneNumber(),
+                user.getEmail(),
                 otp
         );
 
         OtpVerification otpVerification = OtpVerification.builder()
-                .customerId(customerId)
-                .accountNumber(account.getAccountNumber())
+                .userId(userId)
+                .email(user.getEmail())
                 .otpHash(otpHash)
                 .expiresAt(LocalDateTime.now().plusMinutes(OTP_EXPIRY_MINUTES))
                 .attemptCount(0)
@@ -81,7 +83,7 @@ public class OtpServiceImpl implements OtpService {
                 .build();
         otpVerificationRepository.save(otpVerification);
 
-        log.info("OTP generated successfully for customer {} via {}", customerId, channel);
+        log.info("OTP generated successfully for customer {} via {}", userId, channel);
 
         return Response.<String>builder()
                 .statusCode(HttpStatus.OK.value())
@@ -89,6 +91,7 @@ public class OtpServiceImpl implements OtpService {
                 .data("OTP sent via " + channel.name())
                 .build();
     }
+
 
     private String generateOtp() {
         int otp = secureRandom.nextInt(900000) + 100000;
@@ -98,17 +101,21 @@ public class OtpServiceImpl implements OtpService {
 
     @Override
     public Response<String> verifyOtp(VerifyOtpRequest request) {
-        Account account = accountRepository.findByAccountNumber(request.getAccountNumber())
-                .orElseThrow(() -> new ResourceNotFoundException("Account not found"));
 
-        Customer customer = customerRepository.findById(account.getCustomer().getId())
-                .orElseThrow(() -> new ResourceNotFoundException("Customer not found"));
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        Account account = null;
 
-        if (account.getAccountStatus() == AccountStatus.ACTIVE) {
-            throw new BadRequestException("Account is already active.");
+        if(request.getVerificationType() == VerificationType.Account_Activation){
+           account = accountRepository.findByCustomerId(user.getId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Account not found"));
+           if(account.getAccountStatus() == AccountStatus.ACTIVE){
+               throw new BadRequestException("Account is already active.");
+           }
         }
 
-        OtpVerification otpVerification = otpVerificationRepository.findLatestByCustomerId(request.getAccountNumber()).orElseThrow(() -> new ResourceNotFoundException("No Otp found. Please request a new OTP"));
+        OtpVerification otpVerification = otpVerificationRepository.findLatestByUserId(user.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("No Otp found. Please request a new OTP"));
 
         if (otpVerification.getVerifiedAt() !=null){
             throw new BadRequestException("Otp has already been used.");
@@ -130,16 +137,19 @@ public class OtpServiceImpl implements OtpService {
         otpVerification.setVerifiedAt(LocalDateTime.now());
         otpVerificationRepository.save(otpVerification);
 
-        account.setAccountStatus(AccountStatus.ACTIVE);
-        accountRepository.save(account);
+        if(account != null) {
+            account.setAccountStatus(AccountStatus.ACTIVE);
+            accountRepository.save(account);
 
-        try{
-            sendWelcomeEmail(customer.getFirstName(), customer.getEmail(), account.getAccountNumber(), account.getAccountTier());
-        } catch (Exception e) {
-            log.error("Welcome email failed to send {}: {}", customer.getEmail(), e.getMessage());
+            try{
+                sendWelcomeEmail(user.getFirstName(), user.getEmail(), account.getAccountNumber(), account.getAccountTier());
+            } catch (Exception e) {
+                log.error("Welcome email failed to send {}: {}", user.getEmail(), e.getMessage());
+            }
         }
 
-        log.info("Customer {} successfully verified OTP", customer.getId());
+
+        log.info("User {} successfully verified OTP", user.getId());
         return Response.<String>builder()
                 .statusCode(HttpStatus.OK.value())
                 .message("OTP verification successful")
@@ -150,15 +160,21 @@ public class OtpServiceImpl implements OtpService {
     @Override
     @Transactional
     public Response<String> resendOtp(ResendOtpRequest request) {
-        Account account = accountRepository.findByAccountNumber(request.getAccountNumber())
-                .orElseThrow(() -> new ResourceNotFoundException("Account not found"));
-        UUID customerId = account.getCustomer().getId();
 
-        if (account.getAccountStatus() == AccountStatus.ACTIVE) {
-            throw new BadRequestException("Account is already active.");
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        if(request.getVerificationType() == VerificationType.Account_Activation){
+            Account account = accountRepository.findByCustomerId(user.getId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Account not found"));
+            if(account.getAccountStatus() == AccountStatus.ACTIVE){
+                throw new BadRequestException("Account is already active.");
+            }
         }
-        return generateAndSendOtp(customerId, account);
+
+        return generateAndSendOtp(user.getEmail());
     }
+
     private void sendWelcomeEmail(String firstname, String email, String accountNumber, AccountTier accountTier) {
         String welcomeMessage = "Welcome, " + firstname + "!\n\n" +
                 "We are excited to have you on board at POI-BANK DIGITAL BANKING. \n\n" +
@@ -176,4 +192,5 @@ public class OtpServiceImpl implements OtpService {
                 .build();
         emailService.sendEmail(emailDetails);
     }
+
 }

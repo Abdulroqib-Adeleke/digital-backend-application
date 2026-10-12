@@ -22,12 +22,13 @@ public class TransactionAlertServiceImpl implements TransactionAlertService {
     private final EmailService emailService;
 
     @Override
-    public void sendDebitAlert(Account account, BigDecimal amount, LocalDateTime now) {
+    public void sendDebitAlert(Account account,  Account destinationAccount, BigDecimal amount, LocalDateTime now) {
         try{
             Customer customer = getCustomer(account.getCustomer().getId());
             String message = "Dear " + customer.getFirstName() + ",\n\n" +
                     "Your account has been debited with NGN " + amount + "\n" +
-                    "Account Number: " + account.getAccountNumber() + "\n" +
+                    "Destination Account Name: " + destinationAccount.getCustomer().getFirstName() + " " + destinationAccount.getCustomer().getLastName() + "\n" +
+                    "Destination Account Number: " + destinationAccount.getAccountNumber() + "\n" +
                     "Date: " + now + "\n" +
                     "Available Balance: NGN " + account.getBalance() + "\n\n" +
                     "Thank you for banking with us.";
@@ -48,12 +49,36 @@ public class TransactionAlertServiceImpl implements TransactionAlertService {
 
 
     @Override
-    public void sendCreditAlert(Account account, BigDecimal amount, LocalDateTime now) {
+    public void sendCreditAlert(Account account, Account sourceAccount, BigDecimal amount, LocalDateTime now) {
         try{
             Customer customer = getCustomer(account.getCustomer().getId());
             String message = "Dear " + customer.getFirstName() + ",\n\n" +
                     "Your account has been credited with NGN " + amount + "\n" +
-                    "Account Number: " + account.getAccountNumber() + "\n" +
+                    "Source Account Name: " + sourceAccount.getCustomer().getFirstName() + " " + sourceAccount.getCustomer().getLastName() + "\n" +
+                    "Source Account Number: " + sourceAccount.getAccountNumber() + "\n" +
+                    "Date: " + now + "\n" +
+                    "Available Balance: NGN " + account.getBalance() + "\n\n" +
+                    "Thank you for banking with us.";
+
+            EmailDetails emailDetails = EmailDetails.builder()
+                    .recipient(customer.getEmail())
+                    .subject("Credit Alert - " + account.getAccountNumber())
+                    .messageBody(message)
+                    .build();
+            emailService.sendEmail(emailDetails);
+            log.info("Credit alert sent successfully for account {}", account.getAccountNumber());
+        } catch (Exception e) {
+            log.error("Credit alert failed for account {}: {}", account.getAccountNumber(), e.getMessage());
+        }
+    }
+
+    @Override
+    public void sendCreaditAlertForDeposit(Account account, BigDecimal amount, LocalDateTime now) {
+        try{
+            Customer customer = getCustomer(account.getCustomer().getId());
+            String message = "Dear " + customer.getFirstName() + ",\n\n" +
+                    "Your account has been credited with NGN " + amount + "\n" +
+                    "By card deposit\n" +
                     "Date: " + now + "\n" +
                     "Available Balance: NGN " + account.getBalance() + "\n\n" +
                     "Thank you for banking with us.";

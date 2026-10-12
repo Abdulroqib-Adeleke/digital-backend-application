@@ -12,15 +12,15 @@ import java.util.UUID;
 public interface OtpVerificationRepository extends JpaRepository<OtpVerification, UUID> {
     @Query("""
             SELECT o FROM OtpVerification o 
-            WHERE o.customerId = :customerId 
+            WHERE o.userId = :userId 
             AND o.verifiedAt is NULL 
             ORDER BY o.createdAt DESC""")
-    Optional<OtpVerification> findLatestByCustomerId(UUID customerId);
+    Optional<OtpVerification> findLatestByUserId(UUID userId);
 
     @Query("""
             SELECT o FROM OtpVerification o 
-            WHERE o.accountNumber = :accountNumber 
+            WHERE o.email = :email 
             AND o.verifiedAt is NULL 
             ORDER BY o.createdAt DESC""")
-    Optional<OtpVerification> findLatestByCustomerId(String accountNumber);
+    Optional<OtpVerification> findLatestByEmail(String email);
 }

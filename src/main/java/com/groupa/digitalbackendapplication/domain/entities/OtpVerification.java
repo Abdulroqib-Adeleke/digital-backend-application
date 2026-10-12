@@ -20,11 +20,11 @@ public class OtpVerification {
     @GeneratedValue(strategy = GenerationType.UUID)
     private  UUID id;
 
-    @Column(name = "customer_id", nullable = false)
-    private UUID customerId;
+    @Column(name = "user_id", nullable = false)
+    private UUID userId;
 
-    @Column(name = "account_number", nullable = false)
-    private String accountNumber;
+    @Column(name = "email")
+    private String email;
 
     @Column(name = "otp_hash", nullable = false)
     private String otpHash;

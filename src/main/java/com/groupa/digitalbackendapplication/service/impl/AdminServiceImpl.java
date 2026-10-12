@@ -22,10 +22,7 @@ import com.groupa.digitalbackendapplication.utils.LoginSessionUtil;
 import com.groupa.digitalbackendapplication.utils.SecurityUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -71,13 +68,15 @@ public class AdminServiceImpl implements AdminService {
 
         String adminId = buildAdminId(role);
 
+        String password = payload.firstName().toLowerCase() + "@" + payload.lastName().toLowerCase() + "123";
+
         AdminCreationResponse response = buildUser(payload.firstName(), payload.lastName(), payload.email(),
-                payload.password(), payload.phoneNumber(), role, payload.gender(), payload.dateOfBirth(),
+                password, payload.phoneNumber(), role, payload.gender(), payload.dateOfBirth(),
                 payload.address(), adminId);
 
         try {
             String emailSubject = "Admin account Creation";
-            String emailBody = "Dear " + payload.firstName() + " " + payload.lastName().toUpperCase(Locale.ROOT) + ", your admin account has successfully been created. Your Admin ID: " + response.getAdminId();
+            String emailBody = "Dear " + payload.firstName() + " " + payload.lastName().toUpperCase(Locale.ROOT) + ", your admin account has successfully been created. \n\nYour Admin ID: " + response.getAdminId() + "\nYour password: " + password + "\n\nPlease change your password after logging in for the first time.";
             sendMail(payload.email(), emailSubject, emailBody);
         } catch (Exception e){
             log.error("Welcome email failed to send to {}: {}", payload.email(), e.getMessage());
@@ -104,14 +103,15 @@ public class AdminServiceImpl implements AdminService {
             throw new BadRequestException("Admin can not be less than 18 years of age");
 
         String adminId = buildAdminId(role);
+        String password = payload.firstName().toLowerCase() + "@" + payload.lastName().toLowerCase() + "123";
 
         AdminCreationResponse response = buildUser(payload.firstName(), payload.lastName(), payload.email(),
-                payload.password(), payload.phoneNumber(), role, payload.gender(), payload.dateOfBirth(),
+                password, payload.phoneNumber(), role, payload.gender(), payload.dateOfBirth(),
                 payload.address(), adminId);
 
         try {
             String emailSubject = "Admin account Creation";
-            String emailBody = "Dear " + payload.firstName() + " " + payload.lastName().toUpperCase(Locale.ROOT) + ", your admin account has successfully been created. Your Admin ID: " + response.getAdminId();
+            String emailBody = "Dear " + payload.firstName() + " " + payload.lastName().toUpperCase(Locale.ROOT) + ", your admin account has successfully been created. \n\nYour Admin ID: " + response.getAdminId() + "\nYour password: " + password + "\n\nPlease change your password after logging in for the first time.";
             sendMail(payload.email(), emailSubject, emailBody);
         } catch (Exception e){
             log.error("Welcome email failed to send to {}: {}", payload.email(), e.getMessage());
@@ -477,7 +477,9 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     public ResponseWrapper<Page<AuditLog>> getAuditLogs(int pageNumber, int pageSize) {
-        Pageable pageable = PageRequest.of(pageNumber - 1, pageSize);
+        Pageable pageable = PageRequest.of(
+                pageNumber - 1, pageSize,
+                Sort.by(Sort.Direction.DESC, "timeOfCreation"));
 
         Page<AuditLog> auditLogs = auditLogRepository.findAll(pageable);
 
